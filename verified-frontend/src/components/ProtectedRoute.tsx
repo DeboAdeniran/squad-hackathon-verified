@@ -1,20 +1,22 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { TOKEN_KEY } from '../constants';
+import { UserRole } from '../types';
 
 interface ProtectedRouteProps {
-  /** If provided, user must have this role to access the route */
-  requiredRole?: string;
+  isAuthenticated: boolean;
+  role: UserRole | null;
+  requiredRole?: UserRole;
 }
 
-const ProtectedRoute = ({ requiredRole }: ProtectedRouteProps) => {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  const role = sessionStorage.getItem('verified_user_role');
-
-  if (!token) {
+const ProtectedRoute = ({
+  isAuthenticated,
+  role,
+  requiredRole,
+}: ProtectedRouteProps) => {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && role !== requiredRole && role !== 'ADMIN') {
+  if (requiredRole && role !== requiredRole && role !== UserRole.ADMIN) {
     return <Navigate to="/dashboard" replace />;
   }
 

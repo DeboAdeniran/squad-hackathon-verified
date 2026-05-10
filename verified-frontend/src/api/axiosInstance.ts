@@ -1,27 +1,22 @@
 import axios, { AxiosError } from 'axios';
-import { BASE_URL, TOKEN_KEY } from '../constants';
+import { BASE_URL } from '../constants';
 import type { ApiError } from '../types';
 
 export const axiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-});
-
-// ── Request interceptor — attach Bearer token ─────────────────────────────────
-axiosInstance.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true, // sends the HttpOnly cookie automatically on every request
 });
 
 // ── Response interceptor — handle 401 globally ───────────────────────────────
+// No request interceptor needed — the browser attaches the cookie automatically.
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401) {
-      sessionStorage.clear();
+      // Cookie is HttpOnly so we can't clear it from JS.
+      // The backend clears it via the logout endpoint.
+      // Just redirect — the login page will handle the rest.
       window.location.href = '/login';
     }
     return Promise.reject(error);

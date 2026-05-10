@@ -17,7 +17,6 @@ export interface RegisterRequest {
 // ── Responses ─────────────────────────────────────────────────────────────────
 
 export interface LoginResponse {
-  accessToken: string;
   tokenType: string; // always "Bearer"
   expiresIn: number; // seconds — 86400 (24 hrs)
   userId: string;
