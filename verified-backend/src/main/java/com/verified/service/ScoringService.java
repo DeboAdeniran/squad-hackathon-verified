@@ -1,2 +1,7 @@
-package com.verified.service;public interface ScoringService {
+package com.verified.service;
+
+import com.verified.model.Claim;
+
+public interface ScoringService {
+    void scoreClaim(Claim claim);
 }
