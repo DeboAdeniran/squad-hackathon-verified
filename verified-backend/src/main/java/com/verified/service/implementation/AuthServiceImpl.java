@@ -73,4 +73,14 @@ public class AuthServiceImpl implements AuthService {
                 .message("Login Successful")
                 .build();
     }
+
+    @Override
+    public void logout(HttpServletResponse response) {
+        Cookie cookie = new Cookie("access_token","");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
+    }
 }
