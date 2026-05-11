@@ -4,6 +4,7 @@ spring:
   profiles:
     active: dev
 
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/verified_db}
     username: ${DB_USERNAME:postgres}
@@ -45,3 +46,11 @@ squad:
 
 cloudinary:
   url: ${CLOUDINARY_URL:cloudinary://key:secret@cloud}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+    operations-sorter: method
