@@ -4,6 +4,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Application configuration with secrets
+application-dev.yml
+application-prod.yml
+*.local.yml
+
+
 ### STS ###
 .apt_generated
 .classpath
@@ -12,6 +18,12 @@ target/
 .settings
 .springBeans
 .sts4-cache
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 
 ### IntelliJ IDEA ###
 .idea
