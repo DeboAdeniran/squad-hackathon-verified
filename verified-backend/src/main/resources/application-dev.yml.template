@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/verified_db
+    username: postgres
+    password: YOUR_PASSWORD_HERE
+
+  data:
+    redis:
+      enabled: false
+
+jwt:
+  secret: YOUR_JWT_SECRET_HERE
+
+squad:
+  api:
+    key: YOUR_SQUAD_API_KEY
+
+cloudinary:
+  url: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
