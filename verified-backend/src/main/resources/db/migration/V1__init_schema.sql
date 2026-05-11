@@ -6,6 +6,16 @@ CREATE TYPE score_tier AS ENUM ('VERIFIED', 'REVIEW', 'FLAGGED');
 CREATE TYPE squad_action AS ENUM ('RELEASE_PAYMENT', 'HOLD_ESCROW', 'BLOCK_PAYMENT');
 CREATE TYPE file_type AS ENUM ('PHOTO', 'DOCUMENT');
 CREATE TYPE tx_status AS ENUM ('SUCCESS', 'FAILED', 'PENDING');
+CREATE TYPE review_decision AS ENUM ('APPROVE', 'REJECT');
+
+CREATE TABLE users (
+                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                       email VARCHAR(255) NOT NULL UNIQUE,
+                       password VARCHAR(255) NOT NULL,
+                       full_name VARCHAR(255) NOT NULL,
+                       role VARCHAR(50) NOT NULL DEFAULT 'ADJUDICATOR',
+                       created_at TIMESTAMP DEFAULT NOW()
+);
 
 CREATE TABLE claims (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
