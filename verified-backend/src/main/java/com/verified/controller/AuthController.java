@@ -1,8 +1,11 @@
 package com.verified.controller;
 
+import com.verified.dto.request.LoginRequest;
 import com.verified.dto.request.RegisterRequest;
+import com.verified.dto.response.AuthResponse;
 import com.verified.dto.response.RegisterResponse;
 import com.verified.service.AuthService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,5 +24,11 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request){
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                              HttpServletResponse response){
+        return ResponseEntity.status(HttpStatus.OK).body(authService.login(request,response));
     }
 }
