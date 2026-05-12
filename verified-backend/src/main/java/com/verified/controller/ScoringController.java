@@ -1,6 +1,7 @@
 package com.verified.controller;
 
 import com.verified.dto.response.MlScoreResponse;
+import com.verified.exception.ResourceNotFoundException;
 import com.verified.model.Claim;
 import com.verified.model.ScoreFlag;
 import com.verified.model.TrustScore;
@@ -39,7 +40,8 @@ public class ScoringController {
     public ResponseEntity<Void> scoringCallback(@RequestBody MlScoreResponse mlResponse){
         log.info("Scoring callback received for claim {}", mlResponse.getClaimId());
         Claim claim = claimRepository.findById(mlResponse.getClaimId())
-                .orElseThrow(() -> new RuntimeException("Claim not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Claim not found with id: " + mlResponse.getClaimId()));
         ScoreTier tier = switch (mlResponse.getTier().toUpperCase()) {
             case "VERIFIED" -> ScoreTier.VERIFIED;
             case "REVIEW" -> ScoreTier.REVIEW;
