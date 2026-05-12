@@ -3,6 +3,8 @@ package com.verified.service.implementation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.verified.dto.squad.SquadApiResponse;
 import com.verified.dto.squad.SquadEscrowRequest;
+import com.verified.exception.BusinessRuleViolationException;
+import com.verified.exception.ResourceNotFoundException;
 import com.verified.integration.SquadApiClient;
 import com.verified.model.Claim;
 import com.verified.model.SquadTransaction;
@@ -61,6 +63,31 @@ public class SquadServiceImpl implements SquadService {
                         claim.getId(), trustScore.getTrustScore());
             }
         }
+    }
+
+    @Override
+    public void processPaymentAction(Claim claim, String action) {
+        if (claim == null) {
+            throw new ResourceNotFoundException("Claim not found for Squad payment action");
+        }
+
+        String transactionRef = "VFD-" + claim.getId().toString().substring(0, 8).toUpperCase();
+
+        SquadApiResponse response = switch (action) {
+            case "RELEASE" -> squadApiClient.releasePayment(transactionRef);
+            case "BLOCK" -> squadApiClient.blockPayment(transactionRef);
+            case "HOLD" -> squadApiClient.holdEscrow(transactionRef);
+            default -> throw new BusinessRuleViolationException("Unknown Squad action: " + action);
+        };
+
+        SquadAction squadAction = switch (action) {
+            case "RELEASE" -> SquadAction.RELEASE_PAYMENT;
+            case "BLOCK" -> SquadAction.BLOCK_PAYMENT;
+            case "HOLD" -> SquadAction.HOLD_ESCROW;
+            default -> throw new BusinessRuleViolationException("Unknown Squad action: " + action);
+        };
+
+        logTransaction(claim, squadAction, transactionRef, response, action);
     }
 
     private void logTransaction(Claim claim, SquadAction action,

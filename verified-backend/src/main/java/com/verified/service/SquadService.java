@@ -5,4 +5,5 @@ import com.verified.model.TrustScore;
 
 public interface SquadService {
     void processPayment(Claim claim, TrustScore trustScore);
+    void processPaymentAction(Claim claim, String action);
 }

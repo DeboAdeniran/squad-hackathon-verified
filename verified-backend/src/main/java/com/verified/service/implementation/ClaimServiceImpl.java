@@ -3,6 +3,7 @@ package com.verified.service.implementation;
 import com.verified.dto.request.ClaimReviewRequest;
 import com.verified.dto.request.ClaimSubmitRequest;
 import com.verified.dto.response.*;
+import com.verified.exception.BusinessRuleViolationException;
 import com.verified.exception.DuplicateResourceException;
 import com.verified.exception.ResourceNotFoundException;
 import com.verified.model.Claim;
@@ -15,12 +16,14 @@ import com.verified.repository.SquadTransactionRepository;
 import com.verified.repository.TrustScoreRepository;
 import com.verified.service.ClaimService;
 import com.verified.service.ScoringService;
+import com.verified.service.SquadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +39,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final TrustScoreRepository trustScoreRepository;
     private final SquadTransactionRepository squadTransactionRepository;
     private final ScoringService scoringService;
+    private final SquadService squadService;
     @Override
     public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request) {
         boolean duplicate = claimRepository.existsByPolicyNumber(request.getPolicyNumber());
@@ -231,10 +235,25 @@ public class ClaimServiceImpl implements ClaimService {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
 
+        if (claim.getStatus() != ClaimStatus.UNDER_REVIEW) {
+            throw new BusinessRuleViolationException(
+                    "Claim is not under review — current status: " + claim.getStatus());
+        }
+
+        TrustScore trustScore = trustScoreRepository.findByClaimId(claimId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Trust score not found for claim: " + claimId));
+
         if (request.getDecision() == ReviewDecision.APPROVE) {
             claim.setStatus(ClaimStatus.PAID);
+            trustScore.setSquadAction(SquadAction.RELEASE_PAYMENT);
+            trustScoreRepository.save(trustScore);
+            squadService.processPaymentAction(claim, "RELEASE");
         } else {
             claim.setStatus(ClaimStatus.BLOCKED);
+            trustScore.setSquadAction(SquadAction.BLOCK_PAYMENT);
+            trustScoreRepository.save(trustScore);
+            squadService.processPaymentAction(claim, "BLOCK");
         }
 
         claimRepository.save(claim);
@@ -248,8 +267,8 @@ public class ClaimServiceImpl implements ClaimService {
         Long totalToday = claimRepository.countClaimsSince(oneDayAgo);
         Long totalThisWeek = claimRepository.countClaimsSince(oneWeekAgo);
 
-        java.math.BigDecimal totalBlocked = claimRepository.sumAmountByStatus(ClaimStatus.BLOCKED);
-        java.math.BigDecimal totalReleased = claimRepository.sumAmountByStatus(ClaimStatus.PAID);
+        BigDecimal totalBlocked = claimRepository.sumAmountByStatus(ClaimStatus.BLOCKED);
+        BigDecimal totalReleased = claimRepository.sumAmountByStatus(ClaimStatus.PAID);
 
         Long verifiedCount = trustScoreRepository.countByTier(ScoreTier.VERIFIED);
         Long reviewCount = trustScoreRepository.countByTier(ScoreTier.REVIEW);
