@@ -37,6 +37,11 @@ public class ScoringServiceImpl implements ScoringService {
     @Override
     public void scoreClaim(Claim claim) {
         log.info("Starting async scoring for claim {}", claim.getId());
+        TrustScore existingScore = trustScoreRepository.findByClaimId(claim.getId()).orElse(null);
+        if (existingScore != null) {
+            log.warn("Trust score already exists for claim {}, skipping duplicate save", claim.getId());
+            return;
+        }
         try {
             List<String> photoUrls = claimFileRepository.findByClaimId(claim.getId())
                     .stream()

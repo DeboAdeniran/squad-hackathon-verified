@@ -16,6 +16,7 @@ import java.util.UUID;
 
 public interface ClaimRepository extends JpaRepository<Claim, UUID> {
     boolean existsByPolicyNumberAndStatusIn(String policyNumber, List<ClaimStatus> statuses);
+    boolean existsByPolicyNumber(String policyNumber);
     Page<Claim> findAll(Pageable pageable);
     Page<Claim> findByStatus(ClaimStatus status, Pageable pageable);
     Page<Claim> findByClaimType(ClaimType claimType, Pageable pageable);

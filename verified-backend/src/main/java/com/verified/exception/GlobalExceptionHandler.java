@@ -2,6 +2,7 @@ package com.verified.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,6 +17,25 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+
+        String message = "Duplicate entry detected";
+        String cause = ex.getMostSpecificCause().getMessage();
+
+        if (cause.contains("claims_policy_number_key")) {
+            message = "A claim for this policy number already exists";
+        } else if (cause.contains("trust_scores_claim_id_key")) {
+            message = "Trust score already exists for this claim";
+        } else if (cause.contains("users_email_key")) {
+            message = "Email already registered";
+        }
+
+        return buildResponse(HttpStatus.CONFLICT, message, request.getRequestURI());
+    }
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicate(
             DuplicateResourceException ex, HttpServletRequest request) {
@@ -56,6 +76,12 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request.getRequestURI());
     }
 
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, Object>> handleRuntime(
+            RuntimeException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred", request.getRequestURI());
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(
             Exception ex, HttpServletRequest request) {
