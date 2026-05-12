@@ -4,6 +4,9 @@ spring:
   profiles:
     active: dev
 
+  security:
+    filter:
+      dispatcher-types: request, error, async
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/verified_db}
