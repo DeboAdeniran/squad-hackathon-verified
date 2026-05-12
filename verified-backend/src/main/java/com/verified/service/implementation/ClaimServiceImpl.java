@@ -3,6 +3,8 @@ package com.verified.service.implementation;
 import com.verified.dto.request.ClaimReviewRequest;
 import com.verified.dto.request.ClaimSubmitRequest;
 import com.verified.dto.response.*;
+import com.verified.exception.DuplicateResourceException;
+import com.verified.exception.ResourceNotFoundException;
 import com.verified.model.Claim;
 import com.verified.model.ClaimFile;
 import com.verified.model.TrustScore;
@@ -36,12 +38,9 @@ public class ClaimServiceImpl implements ClaimService {
     private final ScoringService scoringService;
     @Override
     public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request) {
-        boolean duplicate = claimRepository.existsByPolicyNumberAndStatusIn(
-                request.getPolicyNumber(),
-                List.of(ClaimStatus.PROCESSING, ClaimStatus.SCORED)
-        );
+        boolean duplicate = claimRepository.existsByPolicyNumber(request.getPolicyNumber());
         if (duplicate){
-            throw new RuntimeException("A claim for this policy number is already being processed");
+            throw new DuplicateResourceException("A claim for this policy number already exists");
         }
 
         Claim claim = Claim.builder()
@@ -89,7 +88,7 @@ public class ClaimServiceImpl implements ClaimService {
     @Override
     public ClaimFileResponse uploadFiles(UUID claimId, List<MultipartFile> files, String fileType) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(()-> new RuntimeException("Claim not found"));
+                .orElseThrow(()-> new ResourceNotFoundException("Claim not found with id: " + claimId));
 
         List<String> urls = new ArrayList<>();
 
@@ -112,7 +111,7 @@ public class ClaimServiceImpl implements ClaimService {
     @Override
     public ClaimResultResponse getClaimResult(UUID claimId) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new RuntimeException("Claim not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
         if (claim.getStatus() == ClaimStatus.PROCESSING) {
             return ClaimResultResponse.builder()
                     .claimId(claim.getId())
@@ -121,7 +120,7 @@ public class ClaimServiceImpl implements ClaimService {
                     .build();
         }
         TrustScore score = trustScoreRepository.findByClaimId(claimId)
-                .orElseThrow(() -> new RuntimeException("Score not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Trust score not found for claim: " + claimId));
 
         List<FlagDto> flags = score.getFlags().stream()
                 .map(f -> FlagDto.builder()
@@ -183,7 +182,7 @@ public class ClaimServiceImpl implements ClaimService {
     @Override
     public ClaimDetailResponse getClaimDetail(UUID claimId) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new RuntimeException("Claim not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
 
         List<ClaimFileDto> fileDtos = claimFileRepository.findByClaimId(claimId).stream()
                 .map(f -> ClaimFileDto.builder()
@@ -230,7 +229,7 @@ public class ClaimServiceImpl implements ClaimService {
     @Override
     public void reviewClaim(UUID claimId, ClaimReviewRequest request) {
         Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new RuntimeException("Claim not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
 
         if (request.getDecision() == ReviewDecision.APPROVE) {
             claim.setStatus(ClaimStatus.PAID);

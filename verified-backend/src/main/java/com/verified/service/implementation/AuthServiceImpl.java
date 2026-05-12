@@ -4,6 +4,7 @@ import com.verified.dto.request.LoginRequest;
 import com.verified.dto.request.RegisterRequest;
 import com.verified.dto.response.AuthResponse;
 import com.verified.dto.response.RegisterResponse;
+import com.verified.exception.DuplicateResourceException;
 import com.verified.model.UserEntity;
 import com.verified.repository.UserRepository;
 import com.verified.security.JwtService;
@@ -30,7 +31,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public RegisterResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())){
-            throw new RuntimeException("Email already registered");
+            throw new DuplicateResourceException("Email already registered");
         }
 
         UserEntity user = UserEntity.builder()
