@@ -45,7 +45,7 @@ ml:
 squad:
   api:
     key: ${SQUAD_API_KEY:your-squad-sandbox-key}
-    base-url: https://sandbox-api-d.squadco.com
+    base-url: ${SQUAD_BASE_URL:https://sandbox-api-d.squadco.com}
 
 cloudinary:
   url: ${CLOUDINARY_URL:cloudinary://key:secret@cloud}
