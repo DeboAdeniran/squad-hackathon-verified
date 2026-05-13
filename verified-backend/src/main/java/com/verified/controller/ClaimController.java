@@ -27,11 +27,19 @@ import java.util.UUID;
 public class ClaimController {
     private final ClaimService claimService;
     @Operation(summary = "Submit a new insurance claim")
-    @PostMapping("/submit")
-    public ResponseEntity<
-            ClaimSubmitResponse> submit(@Valid @RequestBody ClaimSubmitRequest request) {
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(claimService.submitClaim(request));
+    @PostMapping(value = "/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ClaimSubmitResponse> submit(
+            @RequestPart("data") @Valid ClaimSubmitRequest request,
+            @RequestPart(value = "photos", required = false) List<MultipartFile> photos,
+            @RequestPart(value = "documents", required = false) List<MultipartFile> documents) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(claimService.submitClaim(request, photos, documents));
     }
+//    @PostMapping("/submit")
+//    public ResponseEntity<
+//            ClaimSubmitResponse> submit(@Valid @RequestBody ClaimSubmitRequest request) {
+//        return ResponseEntity.status(HttpStatus.ACCEPTED).body(claimService.submitClaim(request));
+//    }
     @Operation(summary = "Upload photos and documents for a claim")
     @PostMapping(value = "/{id}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ClaimFileResponse> uploadFiles(
