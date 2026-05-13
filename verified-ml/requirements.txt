@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+requests
+python-multipart
+pillow
+numpy
+scikit-learn
+python-magic
