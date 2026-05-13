@@ -1,5 +1,6 @@
 package com.verified.service.implementation;
 
+import com.cloudinary.Cloudinary;
 import com.verified.dto.request.ClaimReviewRequest;
 import com.verified.dto.request.ClaimSubmitRequest;
 import com.verified.dto.response.*;
@@ -40,8 +41,12 @@ public class ClaimServiceImpl implements ClaimService {
     private final SquadTransactionRepository squadTransactionRepository;
     private final ScoringService scoringService;
     private final SquadService squadService;
+    private final Cloudinary cloudinary;
     @Override
-    public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request) {
+    public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request,
+                                           List<MultipartFile> photos,
+                                           List<MultipartFile> documents) {
+
         boolean duplicate = claimRepository.existsByPolicyNumber(request.getPolicyNumber());
         if (duplicate){
             throw new DuplicateResourceException("A claim for this policy number already exists");
@@ -59,26 +64,12 @@ public class ClaimServiceImpl implements ClaimService {
 
         Claim saved = claimRepository.save(claim);
 
-        if (request.getPhotoUrls() != null) {
-            request.getPhotoUrls().forEach(url -> {
-                ClaimFile file = ClaimFile.builder()
-                        .claim(saved)
-                        .fileType(FileType.PHOTO)
-                        .fileUrl(url)
-                        .build();
-                claimFileRepository.save(file);
-            });
+        if (photos != null) {
+            photos.forEach(file -> uploadAndSaveFile(saved, file, FileType.PHOTO));
         }
 
-        if (request.getDocumentUrls() != null) {
-            request.getDocumentUrls().forEach(url -> {
-                ClaimFile file = ClaimFile.builder()
-                        .claim(saved)
-                        .fileType(FileType.DOCUMENT)
-                        .fileUrl(url)
-                        .build();
-                claimFileRepository.save(file);
-            });
+        if (documents != null) {
+            documents.forEach(file -> uploadAndSaveFile(saved, file, FileType.DOCUMENT));
         }
 
         scoringService.scoreClaim(saved);
@@ -89,29 +80,61 @@ public class ClaimServiceImpl implements ClaimService {
                 .build();
     }
 
-    @Override
-    public ClaimFileResponse uploadFiles(UUID claimId, List<MultipartFile> files, String fileType) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(()-> new ResourceNotFoundException("Claim not found with id: " + claimId));
+    private void uploadAndSaveFile(Claim claim, MultipartFile file, FileType fileType){
+        try {
+            Map uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    Map.of("folder", "verified/claims/" + claim.getId(), "resource_type", "auto")
+            );
+            String url = (String) uploadResult.get("secure_url");
 
-        List<String> urls = new ArrayList<>();
-
-        files.forEach(file ->{
-            String url = "https://placeholder.cloudinary.com/" + file.getOriginalFilename();
             ClaimFile claimFile = ClaimFile.builder()
                     .claim(claim)
-                    .fileType(FileType.valueOf(fileType.toUpperCase()))
+                    .fileType(fileType)
                     .fileUrl(url)
                     .build();
             claimFileRepository.save(claimFile);
-            urls.add(url);
+        } catch (Exception e) {
+            throw new BusinessRuleViolationException("File upload failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ClaimFileResponse uploadFiles(UUID claimId, List<MultipartFile> files, String fileType) {
+        Claim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
+
+        List<String> urls = new ArrayList<>();
+
+        files.forEach(file -> {
+            try {
+                Map uploadResult = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        Map.of(
+                                "folder", "verified/claims/" + claimId,
+                                "resource_type", "auto"
+                        )
+                );
+                String url = (String) uploadResult.get("secure_url");
+
+                ClaimFile claimFile = ClaimFile.builder()
+                        .claim(claim)
+                        .fileType(FileType.valueOf(fileType.toUpperCase()))
+                        .fileUrl(url)
+                        .build();
+                claimFileRepository.save(claimFile);
+                urls.add(url);
+
+            } catch (Exception e) {
+                throw new BusinessRuleViolationException("File upload failed: " + e.getMessage());
+            }
         });
+
         return ClaimFileResponse.builder()
                 .fileUrls(urls)
                 .message("Files uploaded successfully")
                 .build();
     }
-
     @Override
     public ClaimResultResponse getClaimResult(UUID claimId) {
         Claim claim = claimRepository.findById(claimId)
