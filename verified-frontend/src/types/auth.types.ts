@@ -21,4 +21,5 @@ export interface LoginResponse {
   expiresIn: number; // seconds — 86400 (24 hrs)
   userId: string;
   role: UserRole;
+  fullName: string;
 }
