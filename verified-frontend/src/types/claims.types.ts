@@ -17,10 +17,7 @@ export interface ClaimSubmitRequest {
   claimedAmount: number;
   incidentDate: string; // ISO date string: "YYYY-MM-DD"
   description: string; // min 20 chars
-  photoUrls?: string[];
-  documentUrls?: string[];
 }
-
 export interface ReviewRequest {
   decision: ReviewDecision;
   notes?: string;
@@ -59,7 +56,7 @@ export interface SquadTransaction {
 
 /** Row in the claims list table */
 export interface ClaimSummary {
-  id: string;
+  claimId: string;
   claimantName: string;
   policyNumber: string;
   claimType: ClaimType;
@@ -72,7 +69,7 @@ export interface ClaimSummary {
 
 /** Polling response — returned by GET /api/claims/:id/result */
 export interface ClaimResult {
-  id: string;
+  claimId: string;
   status: ClaimStatus;
   trustScore: number | null; // 0–100, null while PROCESSING
   tier: ScoreTier | null;

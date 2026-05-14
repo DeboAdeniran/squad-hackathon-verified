@@ -185,7 +185,7 @@ export default function ClaimDetailPage() {
               Claims
             </span>
             <span className="mx-1">·</span>
-            <b>{truncUuid(claim.id)}</b>
+            <b>{truncUuid(claim.claimId)}</b>
             <span className="mx-1">·</span>
             {claim.tier ? 'Result' : 'Detail'}
           </>
@@ -339,7 +339,9 @@ export default function ClaimDetailPage() {
             </div>
           ))}
         </div>
-        <div className="font-mono text-xs text-gray-400">ID: {claim.id}</div>
+        <div className="font-mono text-xs text-gray-400">
+          ID: {claim.claimId}
+        </div>
       </div>
 
       {/* ── Overview tab ── */}
@@ -525,7 +527,7 @@ export default function ClaimDetailPage() {
               </button>
 
               <div className="font-mono text-[10px] text-gray-400 mt-2.5 text-center">
-                POST /api/claims/{truncUuid(claim.id)}/review
+                POST /api/claims/{truncUuid(claim.claimId)}/review
               </div>
             </div>
           )}

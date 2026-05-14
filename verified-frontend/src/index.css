@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-display: 'Bricolage Grotesque', 'Geist', serif;
+  --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+}
+
 :root {
   /* Paper palette */
   --bg-0: #ede7d9;
@@ -67,6 +72,19 @@
   --font-display: 'Bricolage Grotesque', 'Geist', serif;
   --font-mono:
     'JetBrains Mono', 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom utilities that aren't in Tailwind by default */
+@utility backdrop-blur-sm {
+  backdrop-filter: blur(8px);
+}
+
+@utility tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility tracking-0 {
+  letter-spacing: 0px;
 }
 
 /* Custom component styles */

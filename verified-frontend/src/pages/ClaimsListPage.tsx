@@ -77,21 +77,27 @@ export default function ClaimsListPage() {
         }
         actions={
           <>
-            <button className="btn">
-              <Filter size={14} /> Last 7 days <ChevronDown size={12} />
+            <button className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-white/20 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px">
+              <Filter size={14} />{' '}
+              <span className="hidden lg:flex items-center gap-1">
+                Last 7 days <ChevronDown size={12} />
+              </span>
             </button>
             <button
-              className="btn btn-primary"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 bg-stone-900 text-amber-50 border-stone-900 shadow-[0_2px_0_#d63a1f,0_4px_12px_-2px_rgba(20,17,13,0.25)] hover:bg-black hover:shadow-[0_2px_0_#d63a1f,0_8px_20px_-4px_rgba(20,17,13,0.35)]"
               onClick={() => navigate('/claims/new')}
             >
-              <Plus size={14} /> New claim
+              <Plus size={14} />
+              <span className="hidden lg:flex items-center gap-1">
+                New claim
+              </span>
             </button>
           </>
         }
       />
 
-      {/* Filter bar */}
-      <div className="glass p-3.5 mb-4 grid grid-cols-[1fr_auto_auto_auto] gap-2.5 items-center">
+      {/* Filter bar - responsive grid */}
+      <div className="glass p-3.5 mb-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-2.5 items-center">
         <div className="relative">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
             <Search size={14} />
@@ -106,8 +112,55 @@ export default function ClaimsListPage() {
             }}
           />
         </div>
+        <div className="lg:flex gap-2.5 hidden">
+          <select
+            className="select w-full sm:w-auto"
+            value={tier}
+            onChange={(e) => {
+              setTier(e.target.value as ScoreTier | 'ALL');
+              handleFilterChange();
+            }}
+          >
+            <option value="ALL">All tiers</option>
+            <option value={ScoreTier.VERIFIED}>Verified</option>
+            <option value={ScoreTier.REVIEW}>Review</option>
+            <option value={ScoreTier.FLAGGED}>Flagged</option>
+          </select>
+          <select
+            className="select w-full sm:w-auto"
+            value={claimType}
+            onChange={(e) => {
+              setClaimType(e.target.value as ClaimType | '');
+              handleFilterChange();
+            }}
+          >
+            <option value="">All types</option>
+            {Object.values(ClaimType).map((t) => (
+              <option key={t} value={t}>
+                {CLAIM_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select w-full sm:w-auto"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as ClaimStatus | '');
+              handleFilterChange();
+            }}
+          >
+            <option value="">All statuses</option>
+            {Object.values(ClaimStatus).map((s) => (
+              <option key={s} value={s}>
+                {CLAIM_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="glass flex gap-2.5 mb-4 lg:hidden">
         <select
-          className="select"
+          className="select w-full sm:w-auto"
           value={tier}
           onChange={(e) => {
             setTier(e.target.value as ScoreTier | 'ALL');
@@ -120,7 +173,7 @@ export default function ClaimsListPage() {
           <option value={ScoreTier.FLAGGED}>Flagged</option>
         </select>
         <select
-          className="select"
+          className="select w-full sm:w-auto"
           value={claimType}
           onChange={(e) => {
             setClaimType(e.target.value as ClaimType | '');
@@ -135,7 +188,7 @@ export default function ClaimsListPage() {
           ))}
         </select>
         <select
-          className="select"
+          className="select w-full sm:w-auto"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value as ClaimStatus | '');
@@ -151,7 +204,7 @@ export default function ClaimsListPage() {
         </select>
       </div>
 
-      {/* Table */}
+      {/* Table with horizontal scroll on mobile */}
       <div className="glass overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-gray-400 text-sm">
@@ -167,23 +220,23 @@ export default function ClaimsListPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="table">
+            <table className="table min-w-160 md:min-w-full">
               <thead>
                 <tr>
                   <th>Claimant</th>
-                  <th>Type</th>
+                  <th className="hidden sm:table-cell">Type</th>
                   <th>Amount</th>
                   <th>Status</th>
-                  <th>Tier</th>
-                  <th>Trust</th>
-                  <th>Submitted</th>
+                  <th className="hidden md:table-cell">Tier</th>
+                  <th className="hidden lg:table-cell">Trust</th>
+                  <th className="hidden sm:table-cell">Submitted</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
                   <tr
-                    key={c.id}
-                    onClick={() => navigate(`/claims/${c.id}`)}
+                    key={c.claimId}
+                    onClick={() => navigate(`/claims/${c.claimId}`)}
                     style={{ cursor: 'pointer' }}
                   >
                     <td>
@@ -192,8 +245,15 @@ export default function ClaimsListPage() {
                         {c.policyNumber}
                       </div>
                     </td>
-                    <td>
+                    <td className="hidden sm:table-cell">
                       <span className="chip">
+                        <ClaimTypeIcon type={c.claimType} />
+                        {CLAIM_TYPE_LABELS[c.claimType]}
+                      </span>
+                    </td>
+                    {/* Show type as badge on mobile */}
+                    <td className="sm:hidden">
+                      <span className="chip text-xs">
                         <ClaimTypeIcon type={c.claimType} />
                         {CLAIM_TYPE_LABELS[c.claimType]}
                       </span>
@@ -202,13 +262,13 @@ export default function ClaimsListPage() {
                     <td>
                       <StatusBadge status={c.status} />
                     </td>
-                    <td>
+                    <td className="hidden md:table-cell">
                       <TierBadge tier={c.tier} />
                     </td>
-                    <td>
+                    <td className="hidden lg:table-cell">
                       <TrustMini score={c.trustScore} />
                     </td>
-                    <td className="mono text-gray-400">
+                    <td className="hidden sm:table-cell mono text-gray-400">
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
@@ -218,11 +278,14 @@ export default function ClaimsListPage() {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination - responsive */}
         {!isLoading && totalElements > 0 && (
-          <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-between">
+          <div className="px-5 py-3 border-t border-gray-200 flex flex-row items-center justify-between gap-3">
             <div className="font-mono text-xs text-gray-400">
-              {totalElements} total · page {page + 1} of {totalPages}
+              {totalElements} total <span className="hidden sm:inline">· </span>
+              <span className="block sm:inline">
+                page {page + 1} of {totalPages}
+              </span>
             </div>
             <div className="flex gap-2">
               <button

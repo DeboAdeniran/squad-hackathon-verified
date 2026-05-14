@@ -19,9 +19,6 @@ export const claimSubmitSchema = z.object({
     }, 'Incident date cannot be in the future'),
 
   description: z.string().min(20, 'Description must be at least 20 characters'),
-
-  photoUrls: z.array(z.string().url()).optional(),
-  documentUrls: z.array(z.string().url()).optional(),
 });
 
 export type ClaimSubmitFormValues = z.infer<typeof claimSubmitSchema>;

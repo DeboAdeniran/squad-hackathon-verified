@@ -66,6 +66,45 @@ export default function Dashboard() {
 
   const tierTotal = donutData.reduce((a, b) => a + b.value, 0);
 
+  const topStats = [
+    {
+      label: 'Claims today',
+      value: stats?.totalClaimsToday ?? 0,
+      delta: 'vs yesterday',
+      deltaIcon: ArrowUp,
+      deltaUp: true,
+      icon: Banknote,
+      color: 'default',
+    },
+    {
+      label: 'This week',
+      value: stats?.totalClaimsThisWeek ?? 0,
+      delta: 'vs last week',
+      deltaIcon: ArrowUp,
+      deltaUp: true,
+      icon: Banknote,
+      color: 'default',
+    },
+    {
+      label: 'Amount released',
+      value: fmtNaira(stats?.totalAmountReleased ?? 0),
+      delta: `${stats?.approvalRate ?? 0}% approval rate`,
+      deltaIcon: ArrowUp,
+      deltaUp: true,
+      icon: Banknote,
+      color: 'green',
+    },
+    {
+      label: 'Amount blocked',
+      value: fmtNaira(stats?.totalAmountBlocked ?? 0),
+      delta: 'Prevented payout',
+      deltaIcon: ShieldAlert,
+      deltaUp: false,
+      icon: Blocks,
+      color: 'red',
+    },
+  ];
+
   return (
     <div>
       <Topbar
@@ -77,73 +116,90 @@ export default function Dashboard() {
         }
         actions={
           <>
-            <button className="btn">
-              <Filter size={14} /> Last 7 days <ChevronDown size={12} />
+            <button className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-white/20 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px">
+              <Filter size={14} />{' '}
+              <span className="hidden sm:flex items-center gap-1">
+                Last 7 days <ChevronDown size={12} />
+              </span>
             </button>
             <button
-              className="btn btn-primary"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 bg-stone-900 text-amber-50 border-stone-900 shadow-[0_2px_0_#d63a1f,0_4px_12px_-2px_rgba(20,17,13,0.25)] hover:bg-black hover:shadow-[0_2px_0_#d63a1f,0_8px_20px_-4px_rgba(20,17,13,0.35)]"
               onClick={() => navigate('/claims/new')}
             >
-              <Plus size={14} /> New claim
+              <Plus size={14} />
+              <span className="hidden sm:flex items-center gap-1">
+                New claim
+              </span>
             </button>
           </>
         }
       />
 
-      {/* Top row stats */}
-      <div className="grid grid-cols-4 gap-3.5 mb-4">
-        <div className="stat">
-          <div className="stat-label">Claims today</div>
-          <div className="stat-value">
-            {statsLoading ? '—' : (stats?.totalClaimsToday ?? 0)}
+      {/* Top row stats - responsive grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-4">
+        {topStats.map((stat) => (
+          <div
+            key={stat.label}
+            className="relative overflow-hidden p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 bg-white/75 backdrop-blur-sm border border-black/5 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)]"
+          >
+            <div
+              className={`absolute left-0 top-4.5 w-0.5 h-4.5 rounded-r-sm ${
+                stat.color === 'green'
+                  ? 'bg-green-700'
+                  : stat.color === 'red'
+                    ? 'bg-red-700'
+                    : 'bg-black'
+              }`}
+            />
+
+            <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
+              {stat.label}
+            </div>
+
+            <div
+              className={`font-['Bricolage_Grotesque'] text-[32px] sm:text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] ${
+                stat.color === 'green'
+                  ? 'text-green-700'
+                  : stat.color === 'red'
+                    ? 'text-red-700'
+                    : 'text-black'
+              }`}
+            >
+              {statsLoading ? '—' : stat.value}
+            </div>
+
+            <div
+              className={`text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] ${
+                stat.deltaUp ? 'text-green-700' : 'text-red-700'
+              }`}
+            >
+              <stat.deltaIcon size={11} /> {statsLoading ? '—' : stat.delta}
+            </div>
+
+            <div
+              className={`absolute top-4.5 right-4.5 size-7.5 rounded-md grid place-items-center border ${
+                stat.color === 'green'
+                  ? 'bg-green-700/10 text-green-700 border-green-700/20'
+                  : stat.color === 'red'
+                    ? 'bg-red-700/10 text-red-700 border-red-700/20'
+                    : 'bg-black/5 text-black/30 border-black/5'
+              }`}
+            >
+              <stat.icon size={16} />
+            </div>
           </div>
-          <div className="stat-delta up">
-            <ArrowUp size={11} /> vs yesterday
-          </div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">This week</div>
-          <div className="stat-value">
-            {statsLoading ? '—' : (stats?.totalClaimsThisWeek ?? 0)}
-          </div>
-          <div className="stat-delta up">
-            <ArrowUp size={11} /> vs last week
-          </div>
-        </div>
-        <div className="stat good">
-          <div className="stat-label">Amount released</div>
-          <div className="stat-value">
-            {statsLoading ? '—' : fmtNaira(stats?.totalAmountReleased ?? 0)}
-          </div>
-          <div className="stat-delta up">
-            <ArrowUp size={11} />{' '}
-            {statsLoading ? '—' : (stats?.approvalRate ?? 0)}% approval rate
-          </div>
-          <div className="stat-icon">
-            <Banknote size={16} />
-          </div>
-        </div>
-        <div className="stat danger">
-          <div className="stat-label">Amount blocked</div>
-          <div className="stat-value">
-            {statsLoading ? '—' : fmtNaira(stats?.totalAmountBlocked ?? 0)}
-          </div>
-          <div className="stat-delta down">
-            <ShieldAlert size={11} /> Prevented payout
-          </div>
-          <div className="stat-icon">
-            <Blocks size={16} />
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Second row: tier donut + queue cards */}
-      <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-3.5 mb-4">
+      {/* Second row: tier donut + queue cards - responsive */}
+      <div className="grid grid-cols-2 lg:grid-cols-[1.1fr_1fr_1fr] gap-3.5 mb-4">
         {/* Tier breakdown with MUI Donut */}
-        <div className="glass p-5">
-          <div className="section-title">
+        <div className="col-span-2 lg:col-span-1 bg-white/75 backdrop-blur-lg border border-black/10 rounded-xl shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] p-5">
+          <div className="font-['Bricolage_Grotesque'] text-[17px] font-semibold text-stone-900 tracking-[-0.02em] mb-3.5 flex items-center gap-2.5">
             Tier breakdown
-            <span className="label-pill">tierBreakdown</span>
+            <span className="font-mono text-[9.5px] text-black/40 tracking-[0.14em] uppercase font-medium px-2 py-0.5 bg-black/5 rounded-full border border-black/10">
+              tierBreakdown
+            </span>
           </div>
 
           {statsLoading ? (
@@ -151,14 +207,14 @@ export default function Dashboard() {
               Loading…
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-6 items-center">
-              <div className="relative">
+            <div className="flex flex-col md:flex-row md:grid md:grid-cols-[auto_1fr] gap-6 items-center">
+              <div className="relative shrink-0">
                 <PieChart
                   series={[
                     {
                       data: donutData,
-                      innerRadius: 50,
-                      outerRadius: 80,
+                      innerRadius: 40,
+                      outerRadius: 70,
                       paddingAngle: 2,
                       cornerRadius: 4,
                       startAngle: -90,
@@ -167,7 +223,7 @@ export default function Dashboard() {
                       cy: 90,
                       highlightScope: { fade: 'global', highlight: 'item' },
                       faded: {
-                        innerRadius: 50,
+                        innerRadius: 40,
                         additionalRadius: -30,
                         color: 'gray',
                       },
@@ -197,83 +253,100 @@ export default function Dashboard() {
                   </span>
                 </div>
               </div>
-              <div className="donut-legend">
-                {donutData.map((d) => (
-                  <div
-                    key={d.id}
-                    className="donut-legend-item"
-                    onClick={() => navigate(`/claims?tier=${d.id}`)}
-                  >
+              <div className="flex-1 w-full">
+                <div className="flex flex-col gap-1.5">
+                  {donutData.map((d) => (
                     <div
-                      className="donut-legend-dot"
-                      style={{ background: d.color }}
-                    />
-                    <div className="text-sm text-gray-700">{d.label}</div>
-                    <div className="donut-legend-val">{d.value}</div>
-                    <div className="donut-legend-pct">
-                      {tierTotal > 0
-                        ? Math.round((d.value / tierTotal) * 100)
-                        : 0}
-                      %
+                      key={d.id}
+                      className="grid grid-cols-[10px_1fr_auto_auto] gap-3 items-center text-[13px] py-2 border-b border-black/10 cursor-pointer transition-opacity hover:opacity-70"
+                      onClick={() => navigate(`/claims?tier=${d.id}`)}
+                    >
+                      <div
+                        className="w-2.5 h-2.5 rounded-xs"
+                        style={{ background: d.color }}
+                      />
+                      <div className="text-sm text-gray-700">{d.label}</div>
+                      <div className="font-['Bricolage_Grotesque'] tabular-nums text-stone-900 font-semibold text-[17px] tracking-[-0.02em]">
+                        {d.value}
+                      </div>
+                      <div className="font-mono text-[11px] text-black/40 w-10 text-right">
+                        {tierTotal > 0
+                          ? Math.round((d.value / tierTotal) * 100)
+                          : 0}
+                        %
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Review queue */}
-        <div className="stat warn">
-          <div className="stat-label">Review queue</div>
-          <div className="stat-value">
+        <div className="p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 relative overflow-hidden bg-white/75 backdrop-blur-sm border border-black/10 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] before:absolute before:left-0 before:top-4.5 before:w-0.5 before:h-4.5 before:rounded-r-sm before:bg-amber-700">
+          <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
+            Review queue
+          </div>
+          <div className="font-['Bricolage_Grotesque'] text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] text-amber-700">
             {statsLoading ? '—' : (stats?.reviewCount ?? 0)}
           </div>
-          <div className="stat-delta" style={{ color: '#b45309' }}>
-            <Clock size={11} /> Awaiting adjudication
+          <div className="text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] text-amber-700">
+            <Clock size={11} className="hidden md:block" /> Awaiting
+            adjudication
           </div>
           <div className="mt-2.5">
             <button
-              className="btn w-full justify-center"
+              className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-black/10 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px"
               onClick={() => navigate('/claims?status=UNDER_REVIEW')}
             >
-              Open review queue <ArrowRight size={12} />
+              <p>
+                <span className="hidden md:inline">Open</span> review queue
+              </p>
+              <ArrowRight size={12} />
             </button>
           </div>
-          <div className="stat-icon" />
+          <div className="absolute top-4.5 right-4.5 w-7.5 h-7.5 rounded-md grid place-items-center bg-amber-700/10 text-amber-700 border border-amber-700/20" />
         </div>
 
         {/* Flagged */}
-        <div className="stat danger">
-          <div className="stat-label">Flagged claims</div>
-          <div className="stat-value">
+        <div className="p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 relative overflow-hidden bg-white/75 backdrop-blur-sm border border-black/10 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] before:absolute before:left-0 before:top-4.5 before:w-0.5 before:h-4.5 before:rounded-r-sm before:bg-red-700">
+          <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
+            Flagged claims
+          </div>
+          <div className="font-['Bricolage_Grotesque'] text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] text-red-700">
             {statsLoading ? '—' : (stats?.flaggedCount ?? 0)}
           </div>
-          <div className="stat-delta" style={{ color: '#b91c1c' }}>
-            <Flame size={11} /> Active fraud signals
+          <div className="text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] text-red-700">
+            <Flame size={11} className="hidden md:block" /> Active fraud signals
           </div>
           <div className="mt-2.5">
             <button
-              className="btn w-full justify-center"
+              className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-black/10 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px"
               onClick={() => navigate('/claims?tier=FLAGGED')}
             >
-              View flagged <ArrowRight size={12} />
+              <p>
+                <span className="hidden md:inline">View</span> flagged
+              </p>
+              <ArrowRight size={12} />
             </button>
           </div>
-          <div className="stat-icon">
+          <div className="absolute top-4.5 right-4.5 w-7.5 h-7.5 rounded-md grid place-items-center bg-red-700/10 text-red-700 border border-red-700/20">
             <ShieldAlert size={16} />
           </div>
         </div>
       </div>
 
-      {/* Recent activity */}
-      <div className="glass overflow-hidden">
+      {/* Recent activity - responsive table */}
+      <div className="bg-white/75 backdrop-blur-lg border border-black/10 rounded-xl shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="section-title m-0">
+          <div className="font-['Bricolage_Grotesque'] text-[17px] font-semibold text-stone-900 tracking-[-0.02em] flex items-center gap-2.5">
             Recent activity
-            <span className="label-pill">live · 60s polling</span>
           </div>
-          <button className="btn btn-ghost" onClick={() => navigate('/claims')}>
+          <button
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium cursor-pointer transition-all duration-100 bg-transparent shadow-none border-transparent hover:bg-black/5"
+            onClick={() => navigate('/claims')}
+          >
             View all <ArrowRight size={12} />
           </button>
         </div>
@@ -283,9 +356,9 @@ export default function Dashboard() {
               Loading claims…
             </div>
           ) : (
-            <table className="table">
+            <table className="w-full border-collapse text-[13px]">
               <thead>
-                <tr>
+                <tr className="[&_th]:text-left [&_th]:text-[9.5px] [&_th]:uppercase [&_th]:tracking-[0.16em] [&_th]:text-black/40 [&_th]:font-mono [&_th]:font-medium [&_th]:px-3.5 [&_th]:py-3 [&_th]:border-b border-black/15 bg-black/5">
                   <th>Claimant</th>
                   <th>Type</th>
                   <th>Amount</th>
@@ -298,9 +371,9 @@ export default function Dashboard() {
               <tbody>
                 {recent.map((c) => (
                   <tr
-                    key={c.id}
-                    className="cursor-pointer hover:bg-accent/5 transition-colors"
-                    onClick={() => navigate(`/claims/${c.id}`)}
+                    key={c.claimId}
+                    className="cursor-pointer transition-colors hover:bg-red-700/5 [&_td]:p-3.5 [&_td]:border-b border-black/10 [&_td]:align-middle"
+                    onClick={() => navigate(`/claims/${c.claimId}`)}
                   >
                     <td>
                       <div className="font-medium">{c.claimantName}</div>
@@ -309,7 +382,7 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td>
-                      <span className="chip">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/5 border border-black/10 text-[10px] text-black/50 font-mono tracking-[0.08em] uppercase font-medium">
                         <ClaimTypeIcon type={c.claimType} />
                         {CLAIM_TYPE_LABELS[c.claimType]}
                       </span>

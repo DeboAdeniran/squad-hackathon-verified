@@ -17,7 +17,8 @@ import { ZodError } from 'zod';
 import { claimsApi } from '../api';
 import { getApiErrorMessage } from '../api';
 
-// Form state
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface FormState {
   claimantName: string;
   policyNumber: string;
@@ -36,20 +37,22 @@ interface FormErrors {
   description?: string;
 }
 
+/** Staged locally — no upload until submit */
 interface StagedFile {
   file: File;
   previewName: string;
   previewSize: string;
-  url?: string; // set after upload
-  uploading: boolean;
-  error?: string;
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SubmitClaimPage() {
   const navigate = useNavigate();
@@ -101,8 +104,6 @@ export default function SubmitClaimPage() {
         ...form,
         claimType: form.claimType as ClaimType,
         claimedAmount: form.claimedAmount === '' ? 0 : form.claimedAmount,
-        photoUrls: [],
-        documentUrls: [],
       });
       setErrors({});
       return true;
@@ -125,8 +126,6 @@ export default function SubmitClaimPage() {
         ...form,
         claimType: form.claimType as ClaimType,
         claimedAmount: form.claimedAmount === '' ? 0 : form.claimedAmount,
-        photoUrls: [],
-        documentUrls: [],
       });
       return true;
     } catch {
@@ -147,56 +146,24 @@ export default function SubmitClaimPage() {
   const showError = (field: keyof FormState): string | null =>
     touched.has(field) && errors[field] ? errors[field]! : null;
 
-  // ── File handling ─────────────────────────────────────────────────────────
+  // ── File staging (local only — uploaded on submit) ────────────────────────
 
-  const stageFiles = (
-    files: FileList,
-    type: 'PHOTO' | 'DOCUMENT',
-    claimId: string,
-  ) => {
-    const newFiles: StagedFile[] = Array.from(files).map((f) => ({
+  const stageFiles = (files: FileList, type: 'PHOTO' | 'DOCUMENT') => {
+    const incoming: StagedFile[] = Array.from(files).map((f) => ({
       file: f,
       previewName: f.name,
       previewSize: fmtBytes(f.size),
-      uploading: true,
     }));
-
-    const setter = type === 'PHOTO' ? setPhotos : setDocs;
-    setter((prev) => [...prev, ...newFiles]);
-
-    // Upload each file
-    claimsApi
-      .uploadFiles(claimId, Array.from(files), type)
-      .then((urls) => {
-        setter((prev) =>
-          prev.map((sf, i) => {
-            const idx = prev.length - newFiles.length + i;
-            if (idx >= prev.length - newFiles.length) {
-              const urlIdx = i - (prev.length - newFiles.length);
-              if (urls[urlIdx] !== undefined) {
-                return { ...sf, url: urls[urlIdx], uploading: false };
-              }
-            }
-            return sf;
-          }),
-        );
-      })
-      .catch((err) => {
-        const msg = getApiErrorMessage(err);
-        setter((prev) =>
-          prev.map((sf) =>
-            sf.uploading ? { ...sf, uploading: false, error: msg } : sf,
-          ),
-        );
-      });
+    if (type === 'PHOTO') setPhotos((p) => [...p, ...incoming]);
+    else setDocs((d) => [...d, ...incoming]);
   };
 
   const removeFile = (type: 'PHOTO' | 'DOCUMENT', index: number) => {
-    const setter = type === 'PHOTO' ? setPhotos : setDocs;
-    setter((prev) => prev.filter((_, i) => i !== index));
+    if (type === 'PHOTO') setPhotos((p) => p.filter((_, i) => i !== index));
+    else setDocs((d) => d.filter((_, i) => i !== index));
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit — one multipart request: data + photos + documents ─────────────
 
   const submit = async () => {
     if (!isFormValid()) {
@@ -217,16 +184,18 @@ export default function SubmitClaimPage() {
     setSubmitError(null);
 
     try {
-      const { id } = await claimsApi.submitClaim({
-        claimantName: form.claimantName,
-        policyNumber: form.policyNumber,
-        claimType: form.claimType as ClaimType,
-        claimedAmount: form.claimedAmount as number,
-        incidentDate: form.incidentDate,
-        description: form.description,
-        photoUrls: photos.filter((p) => p.url).map((p) => p.url!),
-        documentUrls: docs.filter((d) => d.url).map((d) => d.url!),
-      });
+      const { id } = await claimsApi.submitClaim(
+        {
+          claimantName: form.claimantName,
+          policyNumber: form.policyNumber,
+          claimType: form.claimType as ClaimType,
+          claimedAmount: form.claimedAmount as number,
+          incidentDate: form.incidentDate,
+          description: form.description,
+        },
+        photos.map((p) => p.file),
+        docs.map((d) => d.file),
+      );
 
       navigate(`/claims/${id}/result`);
     } catch (err) {
@@ -235,6 +204,8 @@ export default function SubmitClaimPage() {
       setSubmitting(false);
     }
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -247,43 +218,29 @@ export default function SubmitClaimPage() {
         }
       />
 
-      {/* Stepper */}
-      <div className="stepper">
-        <div className="step active">
-          <div className="step-num">1</div>
-          <div className="step-label">Claim details</div>
-        </div>
-        <div className="step-connector" />
-        <div className="step">
-          <div className="step-num">2</div>
-          <div className="step-label">Files</div>
-        </div>
-        <div className="step-connector" />
-        <div className="step">
-          <div className="step-num">3</div>
-          <div className="step-label">Analysis</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+      {/* Main content - responsive grid */}
+      <div className="flex flex-col lg:grid lg:grid-cols-[1.4fr_1fr] gap-4">
         {/* Left: form */}
-        <div className="glass p-6">
-          <div className="section-title">
+        <div className="glass p-4 sm:p-6">
+          <div className="section-title flex flex-wrap items-center justify-between gap-2 mb-4">
             Claim details
-            <span className="label-pill">ClaimSubmitRequest</span>
+            <span className="label-pill text-xs">ClaimSubmitRequest</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="field">
-              <label>Full name</label>
+              <label className="text-sm font-medium">Full name</label>
               <input
-                className={`input ${showError('claimantName') ? 'border-flagged' : ''}`}
+                className={`input w-full ${showError('claimantName') ? 'border-flagged' : ''}`}
                 placeholder="e.g. Adaeze Okonkwo"
                 value={form.claimantName}
                 onChange={(e) => update('claimantName', e.target.value)}
                 onBlur={() => handleBlur('claimantName')}
+                disabled={submitting}
               />
-              <div className="hint">claimantName · required</div>
+              <div className="hint text-xs text-gray-400 mt-1">
+                claimantName · required
+              </div>
               {showError('claimantName') && (
                 <div className="text-flagged text-xs flex items-center gap-1 mt-1">
                   <AlertCircle size={12} /> {showError('claimantName')}
@@ -292,15 +249,18 @@ export default function SubmitClaimPage() {
             </div>
 
             <div className="field">
-              <label>Policy number</label>
+              <label className="text-sm font-medium">Policy number</label>
               <input
-                className={`input ${showError('policyNumber') ? 'border-flagged' : ''}`}
+                className={`input w-full ${showError('policyNumber') ? 'border-flagged' : ''}`}
                 placeholder="PN-2024-XXXXX"
                 value={form.policyNumber}
                 onChange={(e) => update('policyNumber', e.target.value)}
                 onBlur={() => handleBlur('policyNumber')}
+                disabled={submitting}
               />
-              <div className="hint">policyNumber · must be unique</div>
+              <div className="hint text-xs text-gray-400 mt-1">
+                policyNumber · must be unique
+              </div>
               {showError('policyNumber') && (
                 <div className="text-flagged text-xs flex items-center gap-1 mt-1">
                   <AlertCircle size={12} /> {showError('policyNumber')}
@@ -309,21 +269,24 @@ export default function SubmitClaimPage() {
             </div>
 
             <div className="field">
-              <label>Claim type</label>
+              <label className="text-sm font-medium">Claim type</label>
               <select
-                className={`select ${showError('claimType') ? 'border-flagged' : ''}`}
+                className={`select w-full ${showError('claimType') ? 'border-flagged' : ''}`}
                 value={form.claimType}
                 onChange={(e) =>
                   update('claimType', e.target.value as ClaimType | '')
                 }
                 onBlur={() => handleBlur('claimType')}
+                disabled={submitting}
               >
                 <option value="">Select type…</option>
                 <option value={ClaimType.AUTO}>Auto</option>
                 <option value={ClaimType.HEALTH}>Health</option>
                 <option value={ClaimType.PROPERTY}>Property</option>
               </select>
-              <div className="hint">claimType · AUTO | HEALTH | PROPERTY</div>
+              <div className="hint text-xs text-gray-400 mt-1">
+                claimType · AUTO | HEALTH | PROPERTY
+              </div>
               {showError('claimType') && (
                 <div className="text-flagged text-xs flex items-center gap-1 mt-1">
                   <AlertCircle size={12} /> {showError('claimType')}
@@ -332,14 +295,14 @@ export default function SubmitClaimPage() {
             </div>
 
             <div className="field">
-              <label>Claimed amount</label>
+              <label className="text-sm font-medium">Claimed amount</label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono">
                   ₦
                 </div>
                 <input
                   type="number"
-                  className={`input pl-7 ${showError('claimedAmount') ? 'border-flagged' : ''}`}
+                  className={`input w-full pl-7 ${showError('claimedAmount') ? 'border-flagged' : ''}`}
                   placeholder="0"
                   value={form.claimedAmount}
                   onChange={(e) =>
@@ -349,9 +312,12 @@ export default function SubmitClaimPage() {
                     )
                   }
                   onBlur={() => handleBlur('claimedAmount')}
+                  disabled={submitting}
                 />
               </div>
-              <div className="hint">claimedAmount · must be {'>'} 0</div>
+              <div className="hint text-xs text-gray-400 mt-1">
+                claimedAmount · must be &gt; 0
+              </div>
               {showError('claimedAmount') && (
                 <div className="text-flagged text-xs flex items-center gap-1 mt-1">
                   <AlertCircle size={12} /> {showError('claimedAmount')}
@@ -359,17 +325,20 @@ export default function SubmitClaimPage() {
               )}
             </div>
 
-            <div className="field col-span-2">
-              <label>Incident date</label>
+            <div className="field sm:col-span-2">
+              <label className="text-sm font-medium">Incident date</label>
               <input
                 type="date"
-                className={`input ${showError('incidentDate') ? 'border-flagged' : ''}`}
+                className={`input w-full ${showError('incidentDate') ? 'border-flagged' : ''}`}
                 value={form.incidentDate}
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => update('incidentDate', e.target.value)}
                 onBlur={() => handleBlur('incidentDate')}
+                disabled={submitting}
               />
-              <div className="hint">incidentDate · cannot be a future date</div>
+              <div className="hint text-xs text-gray-400 mt-1">
+                incidentDate · cannot be a future date
+              </div>
               {showError('incidentDate') && (
                 <div className="text-flagged text-xs flex items-center gap-1 mt-1">
                   <AlertCircle size={12} /> {showError('incidentDate')}
@@ -377,20 +346,25 @@ export default function SubmitClaimPage() {
               )}
             </div>
 
-            <div className="field col-span-2">
-              <label>Description of incident</label>
+            <div className="field sm:col-span-2">
+              <label className="text-sm font-medium">
+                Description of incident
+              </label>
               <textarea
-                className={`textarea ${showError('description') ? 'border-flagged' : ''}`}
+                className={`textarea w-full ${showError('description') ? 'border-flagged' : ''}`}
                 placeholder="What happened? Where? When did it occur? Include any relevant context…"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
                 style={{ minHeight: 120 }}
+                disabled={submitting}
               />
-              <div className="flex justify-between">
-                <div className="hint">description · minimum 20 characters</div>
+              <div className="flex justify-between mt-1">
+                <div className="hint text-xs text-gray-400">
+                  description · minimum 20 characters
+                </div>
                 <div
-                  className={`hint ${charCount >= 20 ? 'text-verified' : 'text-gray-400'}`}
+                  className={`hint text-xs ${charCount >= 20 ? 'text-verified' : 'text-gray-400'}`}
                 >
                   {charCount} / 20+
                 </div>
@@ -407,10 +381,10 @@ export default function SubmitClaimPage() {
         {/* Right: file uploads */}
         <div className="flex flex-col gap-4">
           {/* Photos */}
-          <div className="glass p-5">
-            <div className="section-title">
+          <div className="glass p-4 sm:p-5">
+            <div className="section-title flex flex-wrap items-center justify-between gap-2 mb-4">
               Photos
-              <span className="label-pill">fileType: PHOTO</span>
+              <span className="label-pill text-xs">fileType: PHOTO</span>
             </div>
 
             <input
@@ -420,22 +394,26 @@ export default function SubmitClaimPage() {
               multiple
               className="hidden"
               onChange={(e) => {
-                if (e.target.files && form.claimType) {
-                  // We use a temp ID here; files are re-attached on final submit
-                  stageFiles(e.target.files, 'PHOTO', 'temp-' + Date.now());
-                }
+                if (e.target.files) stageFiles(e.target.files, 'PHOTO');
+                e.target.value = '';
               }}
             />
 
             <div
-              className="dropzone"
-              onClick={() => photoInputRef.current?.click()}
+              className="dropzone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all hover:border-accent hover:bg-accent/5"
+              onClick={() => !submitting && photoInputRef.current?.click()}
+              style={{
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.5 : 1,
+              }}
             >
-              <Upload size={22} />
-              <div className="dropzone-title mt-2">
+              <Upload size={22} className="mx-auto text-gray-400" />
+              <div className="dropzone-title mt-2 text-sm font-medium">
                 Drop images or click to upload
               </div>
-              <div className="dropzone-sub">JPG, PNG · Max 10MB per file</div>
+              <div className="dropzone-sub text-xs text-gray-400 mt-1">
+                JPG, PNG · Max 10MB per file
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 mt-3">
@@ -444,7 +422,7 @@ export default function SubmitClaimPage() {
                   key={i}
                   className="flex gap-2.5 items-center p-2 rounded-lg bg-white/55 border border-gray-200"
                 >
-                  <div className="w-7 h-7 rounded-md bg-verified/10 text-verified grid place-items-center">
+                  <div className="w-7 h-7 rounded-md bg-verified/10 text-verified grid place-items-center shrink-0">
                     <ImageIcon size={13} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -453,36 +431,36 @@ export default function SubmitClaimPage() {
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">
                       {p.previewSize} ·{' '}
-                      {p.uploading
-                        ? 'uploading…'
-                        : p.error
-                          ? 'failed'
-                          : 'uploaded'}
+                      {submitting ? (
+                        <span className="text-accent">uploading…</span>
+                      ) : (
+                        'ready'
+                      )}
                     </div>
                   </div>
-                  {p.uploading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  ) : p.error ? (
-                    <AlertCircle size={14} className="text-flagged" />
+                  {submitting ? (
+                    <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : (
-                    <Check size={14} className="text-verified" />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Check size={14} className="text-gray-300" />
+                      <button
+                        className="btn btn-ghost p-1 hover:bg-red-50 rounded"
+                        onClick={() => removeFile('PHOTO', i)}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
                   )}
-                  <button
-                    className="btn btn-ghost p-1"
-                    onClick={() => removeFile('PHOTO', i)}
-                  >
-                    <X size={12} />
-                  </button>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Documents */}
-          <div className="glass p-5">
-            <div className="section-title">
+          <div className="glass p-4 sm:p-5">
+            <div className="section-title flex flex-wrap items-center justify-between gap-2 mb-4">
               Documents
-              <span className="label-pill">fileType: DOCUMENT</span>
+              <span className="label-pill text-xs">fileType: DOCUMENT</span>
             </div>
 
             <input
@@ -492,21 +470,26 @@ export default function SubmitClaimPage() {
               multiple
               className="hidden"
               onChange={(e) => {
-                if (e.target.files) {
-                  stageFiles(e.target.files, 'DOCUMENT', 'temp-' + Date.now());
-                }
+                if (e.target.files) stageFiles(e.target.files, 'DOCUMENT');
+                e.target.value = '';
               }}
             />
 
             <div
-              className="dropzone"
-              onClick={() => docInputRef.current?.click()}
+              className="dropzone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all hover:border-accent hover:bg-accent/5"
+              onClick={() => !submitting && docInputRef.current?.click()}
+              style={{
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.5 : 1,
+              }}
             >
-              <FileIcon size={22} />
-              <div className="dropzone-title mt-2">
+              <FileIcon size={22} className="mx-auto text-gray-400" />
+              <div className="dropzone-title mt-2 text-sm font-medium">
                 Drop files or click to upload
               </div>
-              <div className="dropzone-sub">PDF, DOCX · Max 10MB per file</div>
+              <div className="dropzone-sub text-xs text-gray-400 mt-1">
+                PDF, DOCX · Max 10MB per file
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 mt-3">
@@ -515,7 +498,7 @@ export default function SubmitClaimPage() {
                   key={i}
                   className="flex gap-2.5 items-center p-2 rounded-lg bg-white/55 border border-gray-200"
                 >
-                  <div className="w-7 h-7 rounded-md bg-info/10 text-info grid place-items-center">
+                  <div className="w-7 h-7 rounded-md bg-info/10 text-info grid place-items-center shrink-0">
                     <FileIcon size={13} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -524,26 +507,26 @@ export default function SubmitClaimPage() {
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">
                       {d.previewSize} ·{' '}
-                      {d.uploading
-                        ? 'uploading…'
-                        : d.error
-                          ? 'failed'
-                          : 'uploaded'}
+                      {submitting ? (
+                        <span className="text-accent">uploading…</span>
+                      ) : (
+                        'ready'
+                      )}
                     </div>
                   </div>
-                  {d.uploading ? (
-                    <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  ) : d.error ? (
-                    <AlertCircle size={14} className="text-flagged" />
+                  {submitting ? (
+                    <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : (
-                    <Check size={14} className="text-verified" />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Check size={14} className="text-gray-300" />
+                      <button
+                        className="btn btn-ghost p-1 hover:bg-red-50 rounded"
+                        onClick={() => removeFile('DOCUMENT', i)}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
                   )}
-                  <button
-                    className="btn btn-ghost p-1"
-                    onClick={() => removeFile('DOCUMENT', i)}
-                  >
-                    <X size={12} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -558,22 +541,31 @@ export default function SubmitClaimPage() {
         </div>
       )}
 
-      {/* Footer actions */}
-      <div className="glass mt-4 p-4 flex justify-between items-center">
-        <div className="flex items-center gap-2.5 text-gray-500 text-sm">
-          <Sparkles size={16} className="text-accent" />
-          On submit, Verified AI scores the claim across 5 modules in about 5–15
-          seconds.
+      {/* Footer actions - responsive */}
+      <div className="glass mt-4 p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="flex items-center gap-2.5 text-gray-500 text-xs sm:text-sm">
+          <Sparkles size={16} className="text-accent shrink-0" />
+          <span className="text-center sm:text-left">
+            On submit, Verified AI scores the claim across 5 modules in about
+            5–15 seconds.
+          </span>
         </div>
-        <div className="flex gap-2">
-          <button className="btn" onClick={() => navigate('/claims')}>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            className="btn flex-1 sm:flex-none px-4 py-2"
+            onClick={() => navigate('/claims')}
+            disabled={submitting}
+          >
             Cancel
           </button>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary flex-1 sm:flex-none px-4 py-2 flex items-center justify-center gap-2"
             onClick={submit}
             disabled={!isFormValid() || submitting}
           >
+            {submitting && (
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
             {submitting ? 'Submitting…' : 'Submit for analysis'}{' '}
             <ArrowRight size={14} />
           </button>

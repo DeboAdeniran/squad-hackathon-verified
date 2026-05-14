@@ -7,9 +7,22 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ requiredRole }: ProtectedRouteProps) => {
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, isBootstrapping, role } = useAuth();
 
-  // Not logged in — send to login
+  if (isBootstrapping) {
+    return (
+      <div className="fixed inset-0 grid place-items-center bg-[#F4F0E7]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-[#CF4232] border-t-transparent animate-spin" />
+          <span className="font-mono text-xs text-[#9B9487] uppercase tracking-widest">
+            Verifying session…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Cookie missing or expired — send to login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

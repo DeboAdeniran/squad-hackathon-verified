@@ -165,7 +165,8 @@ export default function ClaimResultPage() {
           Analysis complete
         </div>
         <div className="text-sm text-gray-500 mb-4">
-          Claim <span className="font-mono">{result.id}</span> has been scored.
+          Claim <span className="font-mono">{result.claimId}</span> has been
+          scored.
         </div>
         <div className="flex justify-center gap-2 flex-wrap">
           {result.tier && <TierBadge tier={result.tier} />}
@@ -297,7 +298,7 @@ export default function ClaimResultPage() {
         </button>
         <button
           className="btn btn-primary"
-          onClick={() => navigate(`/claims/${result.id}`)}
+          onClick={() => navigate(`/claims/${result.claimId}`)}
         >
           View full detail <ArrowRight size={14} />
         </button>

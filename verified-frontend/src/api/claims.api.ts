@@ -9,32 +9,37 @@ import type {
 } from '../types';
 
 export const claimsApi = {
-  /** Step 1 of submission — upload files, get back URLs */
-  uploadFiles: async (
-    claimId: string,
-    files: File[],
-    fileType: 'PHOTO' | 'DOCUMENT',
-  ): Promise<string[]> => {
-    const form = new FormData();
-    files.forEach((f) => form.append('files', f));
-    form.append('fileType', fileType);
-
-    const { data } = await axiosInstance.post<string[]>(
-      `/api/claims/${claimId}/files`,
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return data;
-  },
-
-  /** Step 2 of submission — submit the claim payload */
+  /**
+   * Submit a claim with optional files in one multipart request.
+   * Form shape the backend expects:
+   *   data       — JSON blob (ClaimSubmitRequest fields, no file URLs)
+   *   photos     — File(s), key repeated per file
+   *   documents  — File(s), key repeated per file
+   */
   submitClaim: async (
     payload: ClaimSubmitRequest,
+    photos: File[] = [],
+    documents: File[] = [],
   ): Promise<{ id: string; status: string }> => {
+    const form = new FormData();
+
+    // Attach the claim fields as a JSON blob under the "data" key
+    form.append(
+      'data',
+      new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+    );
+
+    // Attach each file under its respective key (repeated entries are fine)
+    photos.forEach((f) => form.append('photos', f));
+    documents.forEach((f) => form.append('documents', f));
+
     const { data } = await axiosInstance.post<{ id: string; status: string }>(
       '/api/claims/submit',
-      payload,
+      form,
+      // Let axios set the Content-Type with the correct boundary automatically
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
+
     return data;
   },
 
