@@ -50,11 +50,11 @@ async def score_claim(request: MlScoreRequest):
     
     # Determine Tier and Action
     if trust_score > 75:
-        tier, action = "FAST_TRACK", "PAY"
+        tier, action = "VERIFIED", "RELEASE_PAYMENT"
     elif trust_score > 40:
-        tier, action = "REVIEW", "ESCROW"
+        tier, action = "REVIEW", "HOLD_ESCROW"
     else:
-        tier, action = "REJECT", "FREEZE"
+        tier, action = "FLAGGED", "BLOCK_PAYMENT"
         
     # Aggregate all flags
     all_flags = photo_flags + doc_flags + behavioral_flags
