@@ -1,10 +1,13 @@
 import requests
 import json
 import uuid
+import sys
+import argparse
+import asyncio
 from decimal import Decimal
 
 # Test payload
-payload = {
+DEFAULT_PAYLOAD = {
     "claimId": str(uuid.uuid4()),
     "claimType": "AUTO_ACCIDENT",
     "claimedAmount": 4500.50,
@@ -16,21 +19,36 @@ payload = {
     }
 }
 
-print("Simulating a request to /score...")
-# We can't easily start the server and wait for it in a single script without complex setup
-# But we can verify the schemas and logic by importing them
-try:
-    from main import calculate_score
-    from schemas import MlScoreRequest
-    import asyncio
-
-    async def test():
+async def run_verification(payload: dict):
+    print("Simulating a request to /score...")
+    try:
+        from main import score_claim
+        from schemas import MlScoreRequest
+        
         request = MlScoreRequest(**payload)
-        response = await calculate_score(request)
+        response = await score_claim(request)
+        
+        print("\nVerification successful! The logic and schemas are correctly implemented.")
         print("\nTest Response:")
         print(json.dumps(response.model_dump(), indent=2, default=str))
+        
+    except Exception as e:
+        print(f"\nVerification failed: {e}")
+        sys.exit(1)
 
-    asyncio.run(test())
-    print("\nVerification successful! The logic and schemas are correctly implemented.")
-except Exception as e:
-    print(f"\nVerification failed: {e}")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Verify ML scoring logic with custom payloads.")
+    parser.add_argument("--file", type=str, help="Path to a JSON file containing the test payload.")
+    args = parser.parse_args()
+
+    payload = DEFAULT_PAYLOAD
+    if args.file:
+        try:
+            with open(args.file, 'r') as f:
+                payload = json.load(f)
+            print(f"Loaded custom payload from {args.file}")
+        except Exception as e:
+            print(f"Error loading payload file: {e}")
+            sys.exit(1)
+
+    asyncio.run(run_verification(payload))

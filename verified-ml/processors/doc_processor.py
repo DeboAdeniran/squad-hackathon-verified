@@ -3,7 +3,9 @@ from typing import List
 from schemas import MlFlag
 
 class DocumentProcessor:
-    def __init__(self):
+    def __init__(self, score_per_url: int = 40, error_chance: float = 0.1):
+        self.score_per_url = score_per_url
+        self.error_chance = error_chance
         # In production, initialize OCR engines (EasyOCR, Tesseract)
         pass
 
@@ -15,11 +17,11 @@ class DocumentProcessor:
             return 0, [MlFlag(module="DOCUMENT", signal="MISSING_DOCS", explanation="No supporting documents (receipts/reports) attached.")]
             
         # Placeholder OCR logic
-        score = min(100, len(urls) * 40 + random.randint(0, 10))
+        score = min(100, len(urls) * self.score_per_url + random.randint(0, 10))
         
         flags = []
         # Simulate an OCR mismatch flag
-        if random.random() < 0.1: # 10% chance for demo
+        if random.random() < self.error_chance:
             flags.append(MlFlag(
                 module="DOCUMENT",
                 signal="OCR_NAME_MISMATCH",

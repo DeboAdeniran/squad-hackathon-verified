@@ -1,0 +1,11 @@
+{
+    "claimId": "550e8400-e29b-41d4-a716-446655440000",
+    "claimType": "AUTO_ACCIDENT",
+    "claimedAmount": 25000.0,
+    "photoUrls": ["http://example.com/p1.jpg"],
+    "documentUrls": [],
+    "claimantPolicyHistory": {
+        "totalClaims": 5,
+        "monthsOnPolicy": 2
+    }
+}

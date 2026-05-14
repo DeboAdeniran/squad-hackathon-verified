@@ -3,7 +3,9 @@ from typing import List
 from schemas import MlFlag
 
 class PhotoProcessor:
-    def __init__(self):
+    def __init__(self, score_per_url: int = 30, min_urls: int = 2):
+        self.score_per_url = score_per_url
+        self.min_urls = min_urls
         # In production, initialize CV models here (e.g., YOLO, MobileNet)
         pass
 
@@ -16,14 +18,14 @@ class PhotoProcessor:
         
         # Placeholder for real model inference
         # Logic: More photos generally increase confidence
-        score = min(100, len(urls) * 30 + random.randint(-5, 5))
+        score = min(100, len(urls) * self.score_per_url + random.randint(-5, 5))
         
         flags = []
-        if len(urls) < 2:
+        if len(urls) < self.min_urls:
             flags.append(MlFlag(
                 module="PHOTO", 
                 signal="LOW_VISIBILITY", 
-                explanation="Only one photo provided. Multi-angle verification highly recommended."
+                explanation=f"Fewer than {self.min_urls} photos provided. Multi-angle verification highly recommended."
             ))
             
         return max(0, score), flags
