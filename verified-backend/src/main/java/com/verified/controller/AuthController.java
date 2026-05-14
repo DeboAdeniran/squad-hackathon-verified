@@ -2,8 +2,11 @@ package com.verified.controller;
 
 import com.verified.dto.request.LoginRequest;
 import com.verified.dto.request.RegisterRequest;
+import com.verified.dto.response.AuthMeResponse;
 import com.verified.dto.response.AuthResponse;
 import com.verified.dto.response.RegisterResponse;
+import com.verified.model.UserEntity;
+import com.verified.security.UserPrincipal;
 import com.verified.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,10 +15,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -42,5 +43,17 @@ public class AuthController {
     public ResponseEntity<Void> logout(HttpServletResponse response){
         authService.logout(response);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Get currently logged in adjudicator")
+    @GetMapping("/me")
+    public ResponseEntity<AuthMeResponse> getMe(Authentication authentication) {
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        UserEntity user = principal.getUser();
+        return ResponseEntity.ok(AuthMeResponse.builder()
+                .userId(user.getId())
+                .fullName(user.getFullName())
+                .role(user.getRole())
+                .build());
     }
 }
