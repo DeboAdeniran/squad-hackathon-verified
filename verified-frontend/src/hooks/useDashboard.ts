@@ -5,7 +5,7 @@ export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: dashboardApi.getStats,
-    staleTime: 60_000, // 1 minute — stats don't need to be real-time
-    refetchInterval: 60_000,
+    staleTime: 300_000, // 5 minutes — stats don't need to be real-time
+    refetchInterval: 300_000,
   });
 }

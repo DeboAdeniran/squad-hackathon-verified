@@ -6,6 +6,7 @@ export const axiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // sends the HttpOnly cookie automatically on every request
+  timeout: 10000, // 10 second timeout to prevent indefinite hangs
 });
 
 // ── Response interceptor — handle 401 globally ───────────────────────────────

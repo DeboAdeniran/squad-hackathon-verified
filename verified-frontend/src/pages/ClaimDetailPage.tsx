@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import { StatusBadge, TierBadge } from '../components/ui';
+import { SkeletonCard, SkeletonText } from '../components/LoadingSkeleton';
 import {
   CLAIM_TYPE_LABELS,
   REVIEW_DECISION_LABELS,
@@ -37,9 +38,9 @@ import {
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useClaimDetail } from '../hooks/useClaimDetail';
-import { claimsApi } from '../api';
+import { useReviewClaimMutation } from '../hooks';
 import { getApiErrorMessage } from '../api';
-import { useQueryClient } from '@tanstack/react-query';
+import { PDFViewerModal } from '../components/PDFViewerModal';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,12 +63,12 @@ const SquadActionLabel = ({ action }: { action: SquadAction | null }) => {
   return <span>{SQUAD_ACTION_LABELS[action]}</span>;
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Main Component ─────────────────────────────────────────────────────────
 
 export default function ClaimDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const reviewMutation = useReviewClaimMutation();
 
   const { data: claim, isLoading, isError } = useClaimDetail(id);
 
@@ -76,25 +77,24 @@ export default function ClaimDetailPage() {
   );
   const [reviewNotes, setReviewNotes] = useState('');
   const [tab, setTab] = useState('overview');
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [pdfViewer, setPdfViewer] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
 
   const handleReviewSubmit = async () => {
     if (!reviewDecision || !id) return;
-    setReviewLoading(true);
-    setReviewError(null);
     try {
-      await claimsApi.reviewClaim(id, {
-        decision: reviewDecision,
-        notes: reviewNotes || undefined,
+      await reviewMutation.mutateAsync({
+        claimId: id,
+        reviewData: {
+          decision: reviewDecision,
+          notes: reviewNotes || undefined,
+        },
       });
-      // Invalidate so the detail re-fetches with updated status
-      await queryClient.invalidateQueries({ queryKey: ['claim-detail', id] });
-      await queryClient.invalidateQueries({ queryKey: ['claims'] });
     } catch (err) {
-      setReviewError(getApiErrorMessage(err));
-    } finally {
-      setReviewLoading(false);
+      // Error is handled by the mutation's error state
+      console.error('Review submission failed:', err);
     }
   };
 
@@ -102,11 +102,10 @@ export default function ClaimDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4" />
-          <div className="text-gray-500">Loading claim details…</div>
-        </div>
+      <div className="space-y-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonText lines={4} />
       </div>
     );
   }
@@ -130,12 +129,12 @@ export default function ClaimDetailPage() {
 
   // ── Derived values ────────────────────────────────────────────────────────
 
-  const showReview = claim.status === ClaimStatus.UNDER_REVIEW;
+  const showReview = claim.trustScore?.status === ClaimStatus.UNDER_REVIEW;
   const photos =
     claim.files?.filter((f) => f.fileType === FileType.PHOTO) || [];
   const docFiles =
     claim.files?.filter((f) => f.fileType === FileType.DOCUMENT) || [];
-  const gaugeColor = getGaugeColor(claim.trustScore);
+  const gaugeColor = getGaugeColor(claim.trustScore?.trustScore);
 
   const MODULE_META = [
     { key: 'identityScore', label: 'Identity' },
@@ -152,7 +151,7 @@ export default function ClaimDetailPage() {
     label: string;
     score: number | null;
   }) => (
-    <div className="module">
+    <div className="module  w-full">
       <div className="module-head">
         <div className="module-icon">
           <span className="text-sm">📊</span>
@@ -172,6 +171,11 @@ export default function ClaimDetailPage() {
     </div>
   );
 
+  const handleViewDocument = (fileUrl: string) => {
+    const fileName = fileUrl.split('/').pop() || 'document.pdf';
+    setPdfViewer({ url: fileUrl, name: fileName });
+  };
+
   return (
     <div>
       <Topbar
@@ -187,7 +191,7 @@ export default function ClaimDetailPage() {
             <span className="mx-1">·</span>
             <b>{truncUuid(claim.claimId)}</b>
             <span className="mx-1">·</span>
-            {claim.tier ? 'Result' : 'Detail'}
+            {claim.trustScore?.tier ? 'Result' : 'Detail'}
           </>
         }
         actions={
@@ -202,13 +206,13 @@ export default function ClaimDetailPage() {
         }
       />
 
-      {/* Hero: trust score + meta */}
-      <div className="glass-hero px-7 mb-4 grid grid-cols-[280px_1fr_auto] gap-7 items-center">
-        {/* Gauge */}
-        <div className="relative">
-          <div className="relative w-55 h-55 mx-auto">
+      {/* Hero section - fully responsive */}
+      <div className="glass-hero px-4 pb-4 xl:pb-0 sm:px-7 mb-4 grid grid-cols-1 md:grid-cols-[auto_auto] xl:grid-cols-[0.4fr_1fr_0.4fr] gap-6 md:gap-7 items-start md:items-center">
+        {/* Gauge - centered on mobile */}
+        <div className="relative mx-auto md:mx-0 md:col-span-2 xl:col-span-1">
+          <div className="relative w-48 h-48 sm:w-55 sm:h-55 mx-auto">
             <Gauge
-              value={claim.trustScore ?? 0}
+              value={claim.trustScore?.trustScore ?? 0}
               valueMin={0}
               valueMax={100}
               startAngle={-90}
@@ -233,10 +237,10 @@ export default function ClaimDetailPage() {
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 <span
-                  className="text-5xl font-bold"
+                  className="text-4xl sm:text-5xl font-bold"
                   style={{ color: gaugeColor }}
                 >
-                  {claim.trustScore ?? 0}
+                  {claim.trustScore?.trustScore ?? 0}
                 </span>
                 / 100
               </div>
@@ -246,28 +250,30 @@ export default function ClaimDetailPage() {
             </div>
           </div>
 
-          {claim.confidence && (
+          {claim.trustScore?.confidence && (
             <div className="text-center mt-3 py-2 border-t border-gray-200">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 border border-gray-200 shadow-sm">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-white/80 border border-gray-200 shadow-sm">
                 <span className="text-xs font-mono text-gray-500 uppercase tracking-wide">
                   Confidence
                 </span>
                 <span
-                  className="text-xl font-bold"
+                  className="text-lg sm:text-xl font-bold"
                   style={{ color: gaugeColor }}
                 >
-                  {Math.round(claim.confidence * 100)} %
+                  {Math.round(claim.trustScore?.confidence * 100)} %
                 </span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Meta */}
+        {/* Meta - responsive grid */}
         <div>
-          <div className="flex gap-2 mb-3 flex-wrap">
-            {claim.tier && <TierBadge tier={claim.tier} />}
-            <StatusBadge status={claim.status} />
+          <div className="flex gap-2 mb-3 flex-wrap justify-center md:justify-start">
+            {claim.trustScore?.tier && (
+              <TierBadge tier={claim.trustScore.tier} />
+            )}
+            <StatusBadge status={claim.trustScore?.status} />
             <span className="chip">
               <span className="mr-1">
                 {claim.claimType === ClaimType.AUTO && '🚗'}
@@ -277,47 +283,51 @@ export default function ClaimDetailPage() {
               {CLAIM_TYPE_LABELS[claim.claimType]}
             </span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center md:text-left">
             <div>
               <div className="stat-label">Policy</div>
-              <div className="font-mono text-sm text-gray-900 mt-1">
+              <div className="font-mono text-xs sm:text-sm text-gray-900 mt-1 break-all">
                 {claim.policyNumber}
               </div>
             </div>
             <div>
               <div className="stat-label">Amount</div>
-              <div className="text-lg font-semibold tabular-nums mt-0.5">
+              <div className="text-base sm:text-lg font-semibold tabular-nums mt-0.5">
                 {fmtNaira(claim.claimedAmount)}
               </div>
             </div>
             <div>
               <div className="stat-label">Incident</div>
-              <div className="text-sm mt-1">{fmtDate(claim.incidentDate)}</div>
+              <div className="text-xs sm:text-sm mt-1">
+                {fmtDate(claim.incidentDate)}
+              </div>
             </div>
             <div>
               <div className="stat-label">Scored</div>
               <div className="font-mono text-xs text-gray-500 mt-1">
-                {claim.scoredAt ? fmtDateTime(claim.scoredAt) : 'Pending'}
+                {claim.trustScore?.scoredAt
+                  ? fmtDateTime(claim.trustScore.scoredAt)
+                  : 'Pending'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Squad action callout */}
+        {/* Squad action callout - full width on mobile */}
         <div
           className={`
-            p-4 rounded-xl border min-w-55 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)]
-            ${claim.squadAction === SquadAction.RELEASE_PAYMENT && 'bg-green-50 border-green-200'}
-            ${claim.squadAction === SquadAction.HOLD_ESCROW && 'bg-orange-50 border-orange-200'}
-            ${claim.squadAction === SquadAction.BLOCK_PAYMENT && 'bg-red-50 border-red-200'}
-            ${!claim.squadAction && 'bg-gray-50 border-gray-200'}
+            p-4 rounded-xl border min-w-50 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)] w-full
+            ${claim.trustScore?.squadAction === SquadAction.RELEASE_PAYMENT && 'bg-green-50 border-green-200'}
+            ${claim.trustScore?.squadAction === SquadAction.HOLD_ESCROW && 'bg-orange-50 border-orange-200'}
+            ${claim.trustScore?.squadAction === SquadAction.BLOCK_PAYMENT && 'bg-red-50 border-red-200'}
+            ${!claim.trustScore?.squadAction && 'bg-gray-50 border-gray-200'}
           `}
         >
           <div className="stat-label">Squad action</div>
           <div className="mt-1.5 text-base font-semibold">
-            <SquadActionLabel action={claim.squadAction} />
+            <SquadActionLabel action={claim.trustScore?.squadAction} />
           </div>
-          <div className="font-mono text-xs text-gray-400 mt-1">
+          <div className="font-mono text-xs text-gray-400 mt-1 break-all">
             via Squad API ·{' '}
             {claim.squadTransactions?.[0]?.status
               ? TX_STATUS_LABELS[claim.squadTransactions[0].status]
@@ -326,9 +336,9 @@ export default function ClaimDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex justify-between items-center mb-3.5">
-        <div className="tabs">
+      {/* Tabs - responsive with horizontal scroll on mobile */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3.5">
+        <div className="flex w-full sm:w-auto">
           {['overview', 'evidence', 'transactions'].map((t) => (
             <div
               key={t}
@@ -339,32 +349,30 @@ export default function ClaimDetailPage() {
             </div>
           ))}
         </div>
-        <div className="font-mono text-xs text-gray-400">
-          ID: {claim.claimId}
-        </div>
       </div>
 
       {/* ── Overview tab ── */}
       {tab === 'overview' && (
         <div
-          className={`grid ${showReview ? 'lg:grid-cols-[1.6fr_1fr]' : 'grid-cols-1'} gap-4`}
+          className={`w-full overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_auto] ${showReview ? '' : ''} gap-4`}
         >
-          <div className="flex flex-col gap-4">
+          <div className={`flex flex-col gap-4 ${showReview ? '' : ''}`}>
             {/* Module scores */}
-            {claim.moduleScores && (
-              <div className="glass p-5">
-                <div className="section-title">
+            {claim.trustScore?.moduleScores && (
+              <div className="glass p-4 sm:p-5 w-full">
+                <div className="section-title flex flex-wrap items-center gap-2">
                   Module scores
                   <span className="label-pill">moduleScores</span>
                 </div>
-                <div className="module-grid">
+                <div className="flex gap-3 overflow-x-auto">
                   {MODULE_META.map((m) => (
                     <ModuleCard
                       key={m.key}
                       label={m.label}
                       score={
-                        claim.moduleScores?.[m.key as keyof ModuleScores] ??
-                        null
+                        claim.trustScore?.moduleScores?.[
+                          m.key as keyof ModuleScores
+                        ] ?? null
                       }
                     />
                   ))}
@@ -373,22 +381,25 @@ export default function ClaimDetailPage() {
             )}
 
             {/* Flags */}
-            <div className="glass p-5">
+            <div className="glass p-4 sm:p-5">
               <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
                 <div className="section-title m-0">
                   Flags raised
                   <span className="label-pill">
-                    flags[] · {claim.flags?.length || 0}
+                    flags[] · {claim.trustScore?.flags?.length || 0}
                   </span>
                 </div>
-                {claim.flags && claim.flags.length > 0 && (
-                  <span className="badge badge-flagged">
-                    <AlertTriangle size={11} /> {claim.flags.length} signal
-                    {claim.flags.length > 1 ? 's' : ''}
-                  </span>
-                )}
+                {claim.trustScore?.flags &&
+                  claim.trustScore.flags.length > 0 && (
+                    <span className="badge badge-flagged">
+                      <AlertTriangle size={11} />{' '}
+                      {claim.trustScore.flags.length} signal
+                      {claim.trustScore.flags.length > 1 ? 's' : ''}
+                    </span>
+                  )}
               </div>
-              {!claim.flags || claim.flags.length === 0 ? (
+              {!claim.trustScore?.flags ||
+              claim.trustScore.flags.length === 0 ? (
                 <div className="py-8 text-center text-gray-400">
                   <ShieldCheck
                     size={28}
@@ -403,25 +414,30 @@ export default function ClaimDetailPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-2.5">
-                  {claim.flags.map((f: FlagItem, i: number) => (
+                  {claim.trustScore?.flags.map((f: FlagItem, i: number) => (
                     <div
                       key={i}
-                      className={`flag-card ${claim.tier === ScoreTier.REVIEW ? 'review' : ''}`}
+                      className={`flag-card flex flex-wrap sm:flex-nowrap items-start gap-2 ${claim.trustScore?.tier === ScoreTier.REVIEW ? 'review' : ''}`}
                     >
-                      <div className="flag-icon">
-                        {claim.tier === ScoreTier.REVIEW ? (
+                      <div className="flag-icon shrink-0">
+                        {claim.trustScore?.tier === ScoreTier.REVIEW ? (
                           <AlertTriangle size={14} />
                         ) : (
                           <ShieldAlert size={14} />
                         )}
                       </div>
-                      <div>
-                        <div className="flag-signal">
+                      <div className="flex-1 min-w-0">
+                        <div className="flag-signal font-medium">
                           {f.module} · {f.signal}
                         </div>
-                        <div className="flag-explanation">{f.explanation}</div>
+                        <div className="flag-explanation text-sm text-gray-600">
+                          {f.explanation}
+                        </div>
                       </div>
-                      <button className="btn btn-ghost" title="More info">
+                      <button
+                        className="btn btn-ghost shrink-0"
+                        title="More info"
+                      >
                         <Eye size={14} />
                       </button>
                     </div>
@@ -431,7 +447,7 @@ export default function ClaimDetailPage() {
             </div>
 
             {/* Description */}
-            <div className="glass p-5">
+            <div className="glass p-4 sm:p-5">
               <div className="section-title">
                 Claimant description
                 <span className="label-pill">description</span>
@@ -442,9 +458,9 @@ export default function ClaimDetailPage() {
             </div>
           </div>
 
-          {/* Review panel — only when UNDER_REVIEW */}
+          {/* Review panel - responsive positioning */}
           {showReview && (
-            <div className="glass-elev p-5 sticky top-0 self-start">
+            <div className="glass-elev p-5 lg:sticky lg:top-0 lg:self-start w-full lg:w-90-[400px]">
               <div className="section-title">
                 Review panel
                 <span className="label-pill">role: ADJUDICATOR</span>
@@ -454,38 +470,38 @@ export default function ClaimDetailPage() {
                 with funds in escrow. Your decision finalises payment.
               </p>
 
-              <div className="seg">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  className={`seg-btn approve ${reviewDecision === ReviewDecision.APPROVE ? 'selected' : ''}`}
+                  className={`seg-btn flex-1 approve ${reviewDecision === ReviewDecision.APPROVE ? 'selected' : ''}`}
                   onClick={() => setReviewDecision(ReviewDecision.APPROVE)}
                 >
                   <div className="seg-title">
                     <Check size={14} />{' '}
                     {REVIEW_DECISION_LABELS[ReviewDecision.APPROVE]}
                   </div>
-                  <div className="seg-desc">
+                  <div className="seg-desc text-xs">
                     Release ₦{(claim.claimedAmount / 1000).toFixed(0)}K from
                     escrow
                   </div>
                 </button>
                 <button
-                  className={`seg-btn reject ${reviewDecision === ReviewDecision.REJECT ? 'selected' : ''}`}
+                  className={`seg-btn flex-1 reject ${reviewDecision === ReviewDecision.REJECT ? 'selected' : ''}`}
                   onClick={() => setReviewDecision(ReviewDecision.REJECT)}
                 >
                   <div className="seg-title">
                     <X size={14} />{' '}
                     {REVIEW_DECISION_LABELS[ReviewDecision.REJECT]}
                   </div>
-                  <div className="seg-desc">
+                  <div className="seg-desc text-xs">
                     Block payment & mark fraudulent
                   </div>
                 </button>
               </div>
 
               <div className="field mt-4">
-                <label>Notes (optional)</label>
+                <label className="text-sm">Notes (optional)</label>
                 <textarea
-                  className="textarea"
+                  className="textarea w-full"
                   placeholder="Add adjudicator commentary for the audit trail…"
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
@@ -493,13 +509,14 @@ export default function ClaimDetailPage() {
                 />
               </div>
 
-              {reviewError && (
+              {reviewMutation.error && (
                 <div className="mt-2 text-xs text-red-600 font-mono flex items-center gap-1">
-                  <AlertTriangle size={12} /> {reviewError}
+                  <AlertTriangle size={12} />{' '}
+                  {getApiErrorMessage(reviewMutation.error)}
                 </div>
               )}
 
-              <div className="divider" />
+              <div className="divider my-4" />
 
               <button
                 className={`
@@ -508,10 +525,10 @@ export default function ClaimDetailPage() {
                   ${reviewDecision === ReviewDecision.REJECT && 'btn-danger'}
                   ${!reviewDecision && 'btn-primary'}
                 `}
-                disabled={!reviewDecision || reviewLoading}
+                disabled={!reviewDecision || reviewMutation.isPending}
                 onClick={handleReviewSubmit}
               >
-                {reviewLoading ? (
+                {reviewMutation.isPending ? (
                   'Submitting…'
                 ) : reviewDecision === ReviewDecision.APPROVE ? (
                   <>
@@ -526,7 +543,7 @@ export default function ClaimDetailPage() {
                 )}
               </button>
 
-              <div className="font-mono text-[10px] text-gray-400 mt-2.5 text-center">
+              <div className="font-mono text-[10px] text-gray-400 mt-2.5 text-center break-all">
                 POST /api/claims/{truncUuid(claim.claimId)}/review
               </div>
             </div>
@@ -538,21 +555,31 @@ export default function ClaimDetailPage() {
       {tab === 'evidence' && (
         <div className="flex flex-col gap-4">
           {photos.length > 0 && (
-            <div className="glass p-5">
+            <div className="glass p-4 sm:p-5">
               <div className="section-title">
                 Photos
                 <span className="label-pill">{photos.length} files</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {photos.map((p: FileItem, i: number) => (
-                  <div key={i}>
-                    <div className="file-thumb">
-                      <div className="grid place-items-center gap-1.5">
-                        <ImageIcon size={28} className="file-icon" />
-                        <div className="file-thumb-label">PHOTO</div>
+                  <div key={i} className="flex flex-col">
+                    {p.fileUrl && (
+                      <div className="grid place-items-center">
+                        <img
+                          src={p.fileUrl}
+                          alt=""
+                          className="max-w-full h-auto rounded-lg"
+                        />
                       </div>
-                    </div>
-                    <div className="font-mono text-xs text-gray-500 mt-1.5 truncate">
+                    )}
+                    {!p.fileType && (
+                      <div className="file-thumb">
+                        <div className="grid place-items-center gap-1.5">
+                          <ImageIcon size={28} className="file-icon" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="font-mono text-xs text-gray-500 mt-1.5 truncate text-center">
                       {p.fileUrl.split('/').pop() || 'photo.jpg'}
                     </div>
                   </div>
@@ -562,7 +589,7 @@ export default function ClaimDetailPage() {
           )}
 
           {docFiles.length > 0 && (
-            <div className="glass p-5">
+            <div className="glass p-4 sm:p-5">
               <div className="section-title">
                 Documents
                 <span className="label-pill">{docFiles.length} files</span>
@@ -571,9 +598,10 @@ export default function ClaimDetailPage() {
                 {docFiles.map((d: FileItem, i: number) => (
                   <div
                     key={i}
-                    className="flex gap-3 items-center p-3 rounded-lg bg-white/55 border border-gray-200"
+                    className="flex flex-col sm:flex-row gap-3 items-start sm:items-center p-3 rounded-lg bg-white/55 border border-gray-200 hover:bg-white/80 transition-colors cursor-pointer"
+                    onClick={() => handleViewDocument(d.fileUrl)}
                   >
-                    <div className="w-9 h-11 rounded bg-blue-50 text-blue-700 grid place-items-center border border-blue-200">
+                    <div className="w-9 h-11 rounded bg-blue-50 text-blue-700 grid place-items-center border border-blue-200 shrink-0">
                       <FileIcon size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -581,17 +609,18 @@ export default function ClaimDetailPage() {
                         {d.fileUrl.split('/').pop() || 'document.pdf'}
                       </div>
                       <div className="font-mono text-xs text-gray-400">
-                        fileType: DOCUMENT
+                        fileType: DOCUMENT · Click to view
                       </div>
                     </div>
-                    <a
-                      href={d.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn shrink-0"
+                    <button
+                      className="btn shrink-0 w-full sm:w-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewDocument(d.fileUrl);
+                      }}
                     >
                       <Eye size={14} /> View
-                    </a>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -610,7 +639,7 @@ export default function ClaimDetailPage() {
       {/* ── Transactions tab ── */}
       {tab === 'transactions' && (
         <div className="glass overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-5 py-4 border-b border-gray-200">
             <div className="section-title m-0">
               Squad transactions
               <span className="label-pill">squadTransactions[]</span>
@@ -622,39 +651,41 @@ export default function ClaimDetailPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table">
+              <table className="table min-w-160 w-full">
                 <thead>
                   <tr>
-                    <th>Action</th>
-                    <th>Squad Reference</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Timestamp</th>
+                    <th className="text-left">Action</th>
+                    <th className="text-left">Squad Reference</th>
+                    <th className="text-left">Amount</th>
+                    <th className="text-left">Status</th>
+                    <th className="text-left">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody>
                   {claim.squadTransactions.map(
                     (t: SquadTransaction, i: number) => (
                       <tr key={i}>
-                        <td>
+                        <td className="py-2">
                           <SquadActionLabel action={t.action} />
                         </td>
-                        <td className="font-mono">{t.squadReference}</td>
-                        <td className="num">{fmtNaira(t.amount)}</td>
-                        <td>
+                        <td className="font-mono py-2 break-all">
+                          {t.squadReference}
+                        </td>
+                        <td className="num py-2">{fmtNaira(t.amount)}</td>
+                        <td className="py-2">
                           <span
                             className={`
-                              badge
-                              ${t.status === TxStatus.SUCCESS && 'badge-verified'}
-                              ${t.status === TxStatus.FAILED && 'badge-flagged'}
-                              ${t.status === TxStatus.PENDING && 'badge-review'}
-                            `}
+                            badge inline-flex
+                            ${t.status === TxStatus.SUCCESS && 'badge-verified'}
+                            ${t.status === TxStatus.FAILED && 'badge-flagged'}
+                            ${t.status === TxStatus.PENDING && 'badge-review'}
+                          `}
                           >
                             <span className="badge-dot" />
                             {TX_STATUS_LABELS[t.status]}
                           </span>
                         </td>
-                        <td className="font-mono text-gray-400">
+                        <td className="font-mono text-gray-400 py-2 text-xs">
                           {fmtDateTime(t.calledAt)}
                         </td>
                       </tr>
@@ -665,6 +696,15 @@ export default function ClaimDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {pdfViewer && (
+        <PDFViewerModal
+          fileUrl={pdfViewer.url}
+          fileName={pdfViewer.name}
+          onClose={() => setPdfViewer(null)}
+        />
       )}
     </div>
   );

@@ -20,7 +20,7 @@ export const claimsApi = {
     payload: ClaimSubmitRequest,
     photos: File[] = [],
     documents: File[] = [],
-  ): Promise<{ id: string; status: string }> => {
+  ): Promise<{ claimId: string; status: string }> => {
     const form = new FormData();
 
     // Attach the claim fields as a JSON blob under the "data" key
@@ -33,7 +33,10 @@ export const claimsApi = {
     photos.forEach((f) => form.append('photos', f));
     documents.forEach((f) => form.append('documents', f));
 
-    const { data } = await axiosInstance.post<{ id: string; status: string }>(
+    const { data } = await axiosInstance.post<{
+      claimId: string;
+      status: string;
+    }>(
       '/api/claims/submit',
       form,
       // Let axios set the Content-Type with the correct boundary automatically

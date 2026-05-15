@@ -308,16 +308,6 @@
   overflow: hidden;
 }
 
-.glass-hero::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--t-1);
-}
-
 .glass-elev {
   background: var(--glass-3);
   border-radius: var(--r-lg);

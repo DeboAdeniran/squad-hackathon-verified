@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
@@ -20,31 +21,36 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public — no sidebar */}
-          <Route path="/login" element={<LoginPage />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public — no sidebar */}
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected — ProtectedRoute redirects to /login if not authenticated */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/claims" element={<ClaimsListPage />} />
-              {/* /claims/new must come before /claims/:id so it isn't swallowed */}
-              <Route path="/claims/new" element={<SubmitClaimPage />} />
-              <Route path="/claims/:id/result" element={<ClaimResultPage />} />
-              <Route path="/claims/:id" element={<ClaimDetailPage />} />
+            {/* Protected — ProtectedRoute redirects to /login if not authenticated */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/claims" element={<ClaimsListPage />} />
+                {/* /claims/new must come before /claims/:id so it isn't swallowed */}
+                <Route path="/claims/new" element={<SubmitClaimPage />} />
+                <Route
+                  path="/claims/:claimId/result"
+                  element={<ClaimResultPage />}
+                />
+                <Route path="/claims/:id" element={<ClaimDetailPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Fallback — unauthenticated users are caught by ProtectedRoute */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  </QueryClientProvider>
+            {/* Fallback — unauthenticated users are caught by ProtectedRoute */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

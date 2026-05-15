@@ -115,39 +115,6 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      {/* Adjudication */}
-      <div>
-        <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#B0A79A]">
-          Adjudication
-        </p>
-
-        <nav>
-          <NavLink
-            to="/claims?status=UNDER_REVIEW"
-            onClick={closeMobileSidebar}
-            className={({ isActive }) =>
-              `${navItemBase} ${
-                isActive
-                  ? 'bg-[#14110D] text-white shadow-sm border-b-2 border-[#CF4232] hover:bg-[#14110D]'
-                  : 'text-[#6B6458] hover:bg-[#ECE3D6]'
-              }`
-            }
-            end
-          >
-            <div className="flex items-center gap-3">
-              <Eye size={18} />
-              <span>Review queue</span>
-            </div>
-
-            {stats && stats.reviewCount > 0 && (
-              <span className="rounded-full bg-[#FFD9D3] px-2 py-0.5 text-xs font-semibold text-[#CF4232]">
-                {stats.reviewCount}
-              </span>
-            )}
-          </NavLink>
-        </nav>
-      </div>
-
       {/* Bottom user card */}
       <div className="mt-auto border-t border-[#E4DED2] pt-4 flex-1 flex flex-col justify-end">
         <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-3 shadow-sm mt-auto">

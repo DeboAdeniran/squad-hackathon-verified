@@ -14,7 +14,11 @@ export function useClaimResult(claimId: string | undefined) {
     enabled: !!claimId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === ClaimStatus.PROCESSING ? POLL_INTERVAL_MS : false;
+
+      return status === ClaimStatus.PROCESSING ||
+        status === ClaimStatus.SUBMITTED
+        ? POLL_INTERVAL_MS
+        : false;
     },
     staleTime: 0,
   });

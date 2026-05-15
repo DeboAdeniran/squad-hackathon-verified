@@ -6,6 +6,7 @@ export function useClaimDetail(claimId: string | undefined) {
     queryKey: ['claim-detail', claimId],
     queryFn: () => claimsApi.getClaimDetail(claimId!),
     enabled: !!claimId,
-    staleTime: 30_000,
+    staleTime: 300_000,
+    refetchInterval: 300_000,
   });
 }

@@ -8,6 +8,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { TierBadge, StatusBadge, TrustMini } from '../components/ui';
+import { SkeletonTable } from '../components/LoadingSkeleton';
 import { CLAIM_STATUS_LABELS, CLAIM_TYPE_LABELS } from '../constants';
 import { ClaimStatus, ClaimType, ScoreTier } from '../types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -103,7 +104,7 @@ export default function ClaimsListPage() {
             <Search size={14} />
           </div>
           <input
-            className="input w-full pl-9"
+            className="input w-full pl-9!"
             placeholder="Search by claimant or policy number…"
             value={search}
             onChange={(e) => {
@@ -207,8 +208,8 @@ export default function ClaimsListPage() {
       {/* Table with horizontal scroll on mobile */}
       <div className="glass overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-400 text-sm">
-            Loading claims…
+          <div className="p-6">
+            <SkeletonTable rows={8} />
           </div>
         ) : isError ? (
           <div className="p-12 text-center text-red-500 text-sm">

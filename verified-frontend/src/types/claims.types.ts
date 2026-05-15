@@ -17,6 +17,11 @@ export interface ClaimSubmitRequest {
   claimedAmount: number;
   incidentDate: string; // ISO date string: "YYYY-MM-DD"
   description: string; // min 20 chars
+  bankDetails: {
+    accountNumber: string;
+    bankCode: string;
+    verifiedAccountName: string;
+  };
 }
 export interface ReviewRequest {
   decision: ReviewDecision;
@@ -81,7 +86,8 @@ export interface ClaimResult {
 }
 
 /** Full detail — returned by GET /api/claims/:id */
-export interface ClaimDetail extends ClaimResult {
+export interface ClaimDetail {
+  claimId: string;
   claimantName: string;
   policyNumber: string;
   claimType: ClaimType;
@@ -91,6 +97,7 @@ export interface ClaimDetail extends ClaimResult {
   createdAt: string;
   files: FileItem[];
   squadTransactions: SquadTransaction[];
+  trustScore: ClaimResult; // embed the ClaimResult for convenience, even though it's technically redundant with some fields
 }
 
 /** Paginated list wrapper */

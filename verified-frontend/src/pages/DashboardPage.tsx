@@ -10,7 +10,9 @@ import {
   Clock,
   ArrowRight,
   Flame,
+  Eye,
 } from 'lucide-react';
+import { SkeletonLine, SkeletonTable } from '../components/LoadingSkeleton';
 import { ClaimType, ScoreTier } from '../types/enums';
 import { TierBadge, StatusBadge, TrustMini } from '../components/ui';
 import { CLAIM_TYPE_LABELS, TIER_LABELS } from '../constants';
@@ -33,6 +35,38 @@ const fmtNaira = (amount: number) => {
   if (amount >= 1_000) return `₦${(amount / 1_000).toFixed(1)}K`;
   return `₦${amount.toLocaleString()}`;
 };
+const reviewCards = [
+  {
+    id: 'reviewQueue',
+    title: 'Review queue',
+    countKey: 'reviewCount',
+    color: 'amber-700',
+    icon: Eye,
+    iconLabel: 'Awaiting adjudication',
+    iconBg: 'bg-amber-700/10',
+    iconBorder: 'border-amber-700/20',
+    navigateTo: '/claims?status=UNDER_REVIEW',
+    buttonText: 'Open review queue',
+    buttonShortText: 'review queue',
+    labelIcon: Clock,
+    labelText: 'Awaiting adjudication',
+  },
+  {
+    id: 'flagged',
+    title: 'Flagged claims',
+    countKey: 'flaggedCount',
+    color: 'red-700',
+    icon: ShieldAlert,
+    iconLabel: 'Active fraud signals',
+    iconBg: 'bg-red-700/10',
+    iconBorder: 'border-red-700/20',
+    navigateTo: '/claims?tier=FLAGGED',
+    buttonText: 'View flagged',
+    buttonShortText: 'flagged',
+    labelIcon: Flame,
+    labelText: 'Active fraud signals',
+  },
+];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -203,8 +237,10 @@ export default function Dashboard() {
           </div>
 
           {statsLoading ? (
-            <div className="h-44 flex items-center justify-center text-gray-400 text-sm">
-              Loading…
+            <div className="space-y-3">
+              <SkeletonLine />
+              <SkeletonLine />
+              <SkeletonLine />
             </div>
           ) : (
             <div className="flex flex-col md:flex-row md:grid md:grid-cols-[auto_1fr] gap-6 items-center">
@@ -282,59 +318,53 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
         {/* Review queue */}
-        <div className="p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 relative overflow-hidden bg-white/75 backdrop-blur-sm border border-black/10 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] before:absolute before:left-0 before:top-4.5 before:w-0.5 before:h-4.5 before:rounded-r-sm before:bg-amber-700">
-          <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
-            Review queue
-          </div>
-          <div className="font-['Bricolage_Grotesque'] text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] text-amber-700">
-            {statsLoading ? '—' : (stats?.reviewCount ?? 0)}
-          </div>
-          <div className="text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] text-amber-700">
-            <Clock size={11} className="hidden md:block" /> Awaiting
-            adjudication
-          </div>
-          <div className="mt-2.5">
-            <button
-              className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-black/10 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px"
-              onClick={() => navigate('/claims?status=UNDER_REVIEW')}
-            >
-              <p>
-                <span className="hidden md:inline">Open</span> review queue
-              </p>
-              <ArrowRight size={12} />
-            </button>
-          </div>
-          <div className="absolute top-4.5 right-4.5 w-7.5 h-7.5 rounded-md grid place-items-center bg-amber-700/10 text-amber-700 border border-amber-700/20" />
-        </div>
+        {reviewCards.map((card) => (
+          <div
+            key={card.id}
+            className="p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 relative overflow-hidden bg-white/75 backdrop-blur-sm border border-black/10 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] before:absolute before:left-0 before:top-4.5 before:w-0.5 before:h-4.5 before:rounded-r-sm"
+            style={{ ['--before-bg' as string]: `var(--${card.color})` }}
+          >
+            {/* Using a style tag or CSS variable for the before pseudo-element color */}
+            <style>{`
+      .${card.id}-before::before {
+        background-color: ${card.color === 'amber-700' ? '#b45309' : '#b91c1c'};
+      }
+    `}</style>
 
-        {/* Flagged */}
-        <div className="p-5 rounded-xl flex flex-col gap-1.5 min-h-32.5 relative overflow-hidden bg-white/75 backdrop-blur-sm border border-black/10 shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] before:absolute before:left-0 before:top-4.5 before:w-0.5 before:h-4.5 before:rounded-r-sm before:bg-red-700">
-          <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
-            Flagged claims
-          </div>
-          <div className="font-['Bricolage_Grotesque'] text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] text-red-700">
-            {statsLoading ? '—' : (stats?.flaggedCount ?? 0)}
-          </div>
-          <div className="text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] text-red-700">
-            <Flame size={11} className="hidden md:block" /> Active fraud signals
-          </div>
-          <div className="mt-2.5">
-            <button
-              className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-black/10 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px"
-              onClick={() => navigate('/claims?tier=FLAGGED')}
+            <div className="text-[10px] text-black/40 tracking-[0.14em] uppercase font-mono font-medium">
+              {card.title}
+            </div>
+            <div
+              className={`font-['Bricolage_Grotesque'] text-[42px] font-semibold tracking-[-0.045em] tabular-nums leading-[0.95] text-${card.color}`}
             >
-              <p>
-                <span className="hidden md:inline">View</span> flagged
-              </p>
-              <ArrowRight size={12} />
-            </button>
+              {statsLoading ? '—' : (stats?.[card.countKey] ?? 0)}
+            </div>
+            <div
+              className={`text-[11px] font-mono flex items-center gap-1 mt-auto tracking-[0.02em] text-${card.color}`}
+            >
+              <card.labelIcon size={11} className="hidden md:block" />{' '}
+              {card.labelText}
+            </div>
+            <div className="mt-2.5">
+              <button
+                className="inline-flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all duration-100 border border-black/10 bg-white text-stone-900 shadow-[0_1px_0_rgba(20,17,13,0.04),0_1px_2px_rgba(20,17,13,0.06)] hover:border-stone-900/15 hover:shadow-[0_2px_0_rgba(20,17,13,0.03),0_8px_16px_-4px_rgba(20,17,13,0.08),0_2px_4px_rgba(20,17,13,0.05)] hover:-translate-y-px"
+                onClick={() => navigate(card.navigateTo)}
+              >
+                <p>
+                  <span className="hidden md:inline">{card.buttonText}</span>
+                  <span className="md:hidden">{card.buttonShortText}</span>
+                </p>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+            <div
+              className={`absolute top-4.5 right-4.5 w-7.5 h-7.5 rounded-md grid place-items-center ${card.iconBg} text-${card.color} ${card.iconBorder}`}
+            >
+              <card.icon size={16} />
+            </div>
           </div>
-          <div className="absolute top-4.5 right-4.5 w-7.5 h-7.5 rounded-md grid place-items-center bg-red-700/10 text-red-700 border border-red-700/20">
-            <ShieldAlert size={16} />
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Recent activity - responsive table */}
@@ -352,7 +382,8 @@ export default function Dashboard() {
         </div>
         <div className="overflow-x-auto">
           {claimsLoading ? (
-            <div className="p-8 text-center text-gray-400 text-sm">
+            <div className="p-4 sm:p-5 text-transparent">
+              <SkeletonTable rows={5} />
               Loading claims…
             </div>
           ) : (

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Loader2,
 } from 'lucide-react';
+import { SkeletonCard, SkeletonText } from '../components/LoadingSkeleton';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useClaimResult } from '../hooks/useClaimResult';
 import { StatusBadge, TierBadge } from '../components/ui';
@@ -62,9 +63,9 @@ const ModuleCard = ({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ClaimResultPage() {
-  const { id } = useParams<{ id: string }>();
+  const { claimId } = useParams<{ claimId: string }>();
   const navigate = useNavigate();
-  const { data: result, isLoading, isError } = useClaimResult(id);
+  const { data: result, isLoading, isError } = useClaimResult(claimId);
 
   const isProcessing =
     !result ||
@@ -75,11 +76,10 @@ export default function ClaimResultPage() {
 
   if (isLoading && !result) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4" />
-          <div className="text-gray-500 text-sm">Connecting…</div>
-        </div>
+      <div className="space-y-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonText lines={3} />
       </div>
     );
   }
@@ -139,7 +139,7 @@ export default function ClaimResultPage() {
 
           <div className="flex items-center justify-center gap-2 mt-6 font-mono text-xs text-gray-400">
             <Clock size={12} />
-            Polling GET /api/claims/{id?.slice(0, 8)}…/result
+            Polling GET /api/claims/{claimId?.slice(0, 8)}…/result
           </div>
         </div>
       </div>

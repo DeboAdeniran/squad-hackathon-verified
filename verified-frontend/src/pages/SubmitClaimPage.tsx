@@ -14,8 +14,9 @@ import { useNavigate } from 'react-router-dom';
 import { ClaimType } from '../types/enums';
 import { claimSubmitSchema, type ClaimSubmitFormValues } from '../schemas';
 import { ZodError } from 'zod';
-import { claimsApi } from '../api';
+import { useSubmitClaimMutation } from '../hooks';
 import { getApiErrorMessage } from '../api';
+import { BankForm } from '../components/bankForm';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,16 @@ interface FormState {
   description: string;
 }
 
+interface BankDetailsState {
+  accountNumber: string;
+  bankCode: string;
+  bankName: string;
+  verifiedAccountName: string;
+  isVerifying: boolean;
+  isVerified: boolean;
+  verificationError: string | null;
+}
+
 interface FormErrors {
   claimantName?: string;
   policyNumber?: string;
@@ -35,6 +46,7 @@ interface FormErrors {
   claimedAmount?: string;
   incidentDate?: string;
   description?: string;
+  bankDetails?: string;
 }
 
 /** Staged locally — no upload until submit */
@@ -56,6 +68,7 @@ const fmtBytes = (bytes: number) => {
 
 export default function SubmitClaimPage() {
   const navigate = useNavigate();
+  const submitMutation = useSubmitClaimMutation();
 
   const [form, setForm] = useState<FormState>({
     claimantName: '',
@@ -65,15 +78,24 @@ export default function SubmitClaimPage() {
     incidentDate: '',
     description: '',
   });
+  const [bankDetails, setBankDetails] = useState<BankDetailsState>({
+    accountNumber: '',
+    bankCode: '',
+    bankName: '',
+    verifiedAccountName: '',
+    isVerifying: false,
+    isVerified: false,
+    verificationError: null,
+  });
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Set<keyof FormState>>(new Set());
   const [photos, setPhotos] = useState<StagedFile[]>([]);
   const [docs, setDocs] = useState<StagedFile[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  const isSubmitting = submitMutation.isPending;
 
   const charCount = form.description.length;
 
@@ -127,7 +149,8 @@ export default function SubmitClaimPage() {
         claimType: form.claimType as ClaimType,
         claimedAmount: form.claimedAmount === '' ? 0 : form.claimedAmount,
       });
-      return true;
+      // Also check if bank details are verified
+      return bankDetails.isVerified;
     } catch {
       return false;
     }
@@ -163,7 +186,7 @@ export default function SubmitClaimPage() {
     else setDocs((d) => d.filter((_, i) => i !== index));
   };
 
-  // ── Submit — one multipart request: data + photos + documents ─────────────
+  // ── Submit — one multipart request: data + photos + documents + bank details ─────────────
 
   const submit = async () => {
     if (!isFormValid()) {
@@ -180,28 +203,29 @@ export default function SubmitClaimPage() {
       return;
     }
 
-    setSubmitting(true);
-    setSubmitError(null);
-
     try {
-      const { id } = await claimsApi.submitClaim(
-        {
+      const { claimId } = await submitMutation.mutateAsync({
+        data: {
           claimantName: form.claimantName,
           policyNumber: form.policyNumber,
           claimType: form.claimType as ClaimType,
           claimedAmount: form.claimedAmount as number,
           incidentDate: form.incidentDate,
           description: form.description,
+          // Add bank details to the submission
+          bankDetails: {
+            accountNumber: bankDetails.accountNumber,
+            bankCode: bankDetails.bankCode,
+            verifiedAccountName: bankDetails.verifiedAccountName,
+          },
         },
-        photos.map((p) => p.file),
-        docs.map((d) => d.file),
-      );
-
-      navigate(`/claims/${id}/result`);
+        photos: photos.map((p) => p.file),
+        documents: docs.map((d) => d.file),
+      });
+      navigate(`/claims/${claimId}/result`);
     } catch (err) {
-      setSubmitError(getApiErrorMessage(err));
-    } finally {
-      setSubmitting(false);
+      // Error is automatically captured by submitMutation.error
+      console.error('Claim submission failed:', err);
     }
   };
 
@@ -221,7 +245,7 @@ export default function SubmitClaimPage() {
       {/* Main content - responsive grid */}
       <div className="flex flex-col lg:grid lg:grid-cols-[1.4fr_1fr] gap-4">
         {/* Left: form */}
-        <div className="glass p-4 sm:p-6">
+        <div className="glass p-4 sm:p-6 my-auto">
           <div className="section-title flex flex-wrap items-center justify-between gap-2 mb-4">
             Claim details
             <span className="label-pill text-xs">ClaimSubmitRequest</span>
@@ -236,7 +260,7 @@ export default function SubmitClaimPage() {
                 value={form.claimantName}
                 onChange={(e) => update('claimantName', e.target.value)}
                 onBlur={() => handleBlur('claimantName')}
-                disabled={submitting}
+                disabled={isSubmitting}
               />
               <div className="hint text-xs text-gray-400 mt-1">
                 claimantName · required
@@ -256,7 +280,7 @@ export default function SubmitClaimPage() {
                 value={form.policyNumber}
                 onChange={(e) => update('policyNumber', e.target.value)}
                 onBlur={() => handleBlur('policyNumber')}
-                disabled={submitting}
+                disabled={isSubmitting}
               />
               <div className="hint text-xs text-gray-400 mt-1">
                 policyNumber · must be unique
@@ -277,7 +301,7 @@ export default function SubmitClaimPage() {
                   update('claimType', e.target.value as ClaimType | '')
                 }
                 onBlur={() => handleBlur('claimType')}
-                disabled={submitting}
+                disabled={isSubmitting}
               >
                 <option value="">Select type…</option>
                 <option value={ClaimType.AUTO}>Auto</option>
@@ -312,7 +336,7 @@ export default function SubmitClaimPage() {
                     )
                   }
                   onBlur={() => handleBlur('claimedAmount')}
-                  disabled={submitting}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="hint text-xs text-gray-400 mt-1">
@@ -334,7 +358,7 @@ export default function SubmitClaimPage() {
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => update('incidentDate', e.target.value)}
                 onBlur={() => handleBlur('incidentDate')}
-                disabled={submitting}
+                disabled={isSubmitting}
               />
               <div className="hint text-xs text-gray-400 mt-1">
                 incidentDate · cannot be a future date
@@ -357,7 +381,7 @@ export default function SubmitClaimPage() {
                 onChange={(e) => update('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
                 style={{ minHeight: 120 }}
-                disabled={submitting}
+                disabled={isSubmitting}
               />
               <div className="flex justify-between mt-1">
                 <div className="hint text-xs text-gray-400">
@@ -378,8 +402,14 @@ export default function SubmitClaimPage() {
           </div>
         </div>
 
-        {/* Right: file uploads */}
+        {/* Right: file uploads and bank details */}
         <div className="flex flex-col gap-4">
+          <BankForm
+            bankDetails={bankDetails}
+            onBankDetailsChange={setBankDetails}
+            disabled={isSubmitting}
+          />
+
           {/* Photos */}
           <div className="glass p-4 sm:p-5">
             <div className="section-title flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -401,10 +431,10 @@ export default function SubmitClaimPage() {
 
             <div
               className="dropzone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all hover:border-accent hover:bg-accent/5"
-              onClick={() => !submitting && photoInputRef.current?.click()}
+              onClick={() => !isSubmitting && photoInputRef.current?.click()}
               style={{
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.5 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.5 : 1,
               }}
             >
               <Upload size={22} className="mx-auto text-gray-400" />
@@ -431,14 +461,14 @@ export default function SubmitClaimPage() {
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">
                       {p.previewSize} ·{' '}
-                      {submitting ? (
+                      {isSubmitting ? (
                         <span className="text-accent">uploading…</span>
                       ) : (
                         'ready'
                       )}
                     </div>
                   </div>
-                  {submitting ? (
+                  {isSubmitting ? (
                     <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : (
                     <div className="flex items-center gap-1 shrink-0">
@@ -477,10 +507,10 @@ export default function SubmitClaimPage() {
 
             <div
               className="dropzone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all hover:border-accent hover:bg-accent/5"
-              onClick={() => !submitting && docInputRef.current?.click()}
+              onClick={() => !isSubmitting && docInputRef.current?.click()}
               style={{
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.5 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.5 : 1,
               }}
             >
               <FileIcon size={22} className="mx-auto text-gray-400" />
@@ -507,14 +537,14 @@ export default function SubmitClaimPage() {
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">
                       {d.previewSize} ·{' '}
-                      {submitting ? (
+                      {isSubmitting ? (
                         <span className="text-accent">uploading…</span>
                       ) : (
                         'ready'
                       )}
                     </div>
                   </div>
-                  {submitting ? (
+                  {isSubmitting ? (
                     <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : (
                     <div className="flex items-center gap-1 shrink-0">
@@ -535,9 +565,9 @@ export default function SubmitClaimPage() {
       </div>
 
       {/* Submit error */}
-      {submitError && (
+      {submitMutation.error && (
         <div className="mt-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-mono flex items-center gap-2">
-          <AlertCircle size={14} /> {submitError}
+          <AlertCircle size={14} /> {getApiErrorMessage(submitMutation.error)}
         </div>
       )}
 
@@ -546,27 +576,32 @@ export default function SubmitClaimPage() {
         <div className="flex items-center gap-2.5 text-gray-500 text-xs sm:text-sm">
           <Sparkles size={16} className="text-accent shrink-0" />
           <span className="text-center sm:text-left">
-            On submit, Verified AI scores the claim across 5 modules in about
-            5–15 seconds.
+            On submit, Verified AI scores the claim across 5 modules.
           </span>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             className="btn flex-1 sm:flex-none px-4 py-2"
             onClick={() => navigate('/claims')}
-            disabled={submitting}
+            disabled={isSubmitting}
           >
             Cancel
           </button>
           <button
             className="btn btn-primary flex-1 sm:flex-none px-4 py-2 flex items-center justify-center gap-2"
             onClick={submit}
-            disabled={!isFormValid() || submitting}
+            disabled={!isFormValid() || isSubmitting}
           >
-            {submitting && (
+            {isSubmitting && (
               <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             )}
-            {submitting ? 'Submitting…' : 'Submit for analysis'}{' '}
+            {isSubmitting ? (
+              <span>Submitting…</span>
+            ) : (
+              <span>
+                Submit <span className="hidden md:inline">for analysis</span>
+              </span>
+            )}{' '}
             <ArrowRight size={14} />
           </button>
         </div>
