@@ -42,12 +42,16 @@ public class ScoringController {
         Claim claim = claimRepository.findById(mlResponse.getClaimId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Claim not found with id: " + mlResponse.getClaimId()));
-        ScoreTier tier = switch (mlResponse.getTier().toUpperCase()) {
+        if (trustScoreRepository.findByClaimId(mlResponse.getClaimId()).isPresent()) {
+            log.warn("Trust score already exists for claim {} — callback ignored", mlResponse.getClaimId());
+            return ResponseEntity.ok().build();
+        }
+        ScoreTier tier = switch (mlResponse.getTier() != null ? mlResponse.getTier().toUpperCase() : "FLAGGED") {
             case "VERIFIED" -> ScoreTier.VERIFIED;
             case "REVIEW" -> ScoreTier.REVIEW;
             default -> ScoreTier.FLAGGED;
         };
-        SquadAction squadAction = switch (mlResponse.getSquadAction().toUpperCase()) {
+        SquadAction squadAction = switch (mlResponse.getSquadAction() != null ? mlResponse.getSquadAction().toUpperCase() : "BLOCK_PAYMENT") {
             case "RELEASE_PAYMENT" -> SquadAction.RELEASE_PAYMENT;
             case "HOLD_ESCROW" -> SquadAction.HOLD_ESCROW;
             default -> SquadAction.BLOCK_PAYMENT;

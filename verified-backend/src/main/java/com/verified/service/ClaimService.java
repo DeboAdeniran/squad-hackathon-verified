@@ -14,6 +14,7 @@ public interface ClaimService {
     ClaimSubmitResponse submitClaim(ClaimSubmitRequest request,
                                     List<MultipartFile> photos,
                                     List<MultipartFile> documents);
+    AccountLookupResponse lookupBankAccount(String bankCode, String accountNumber);
     ClaimFileResponse uploadFiles(UUID claimId, List<MultipartFile> files, String fileType);
     ClaimResultResponse getClaimResult(UUID claimId);
     Page<ClaimSummaryResponse> getAllClaims(String tier, String claimType, String status, Pageable pageable);
