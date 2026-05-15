@@ -46,6 +46,8 @@ squad:
   api:
     key: ${SQUAD_API_KEY:your-squad-sandbox-key}
     base-url: ${SQUAD_BASE_URL:https://sandbox-api-d.squadco.com}
+  merchant:
+    id: ${SQUAD_MERCHANT_ID:your-merchant-id}
 
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
