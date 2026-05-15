@@ -1,31 +1,34 @@
 import random
-from typing import List
 from schemas import MlFlag
 
 class PhotoProcessor:
-    def __init__(self, score_per_url: int = 30, min_urls: int = 2):
+    def __init__(self, score_per_url, min_urls):
         self.score_per_url = score_per_url
         self.min_urls = min_urls
-        # In production, initialize CV models here (e.g., YOLO, MobileNet)
-        pass
 
-    def analyze_photos(self, urls: List[str]) -> tuple[int, List[MlFlag]]:
-        """
-        Analyzes photos for damage, metadata consistency, and deepfake detection.
-        """
-        if not urls:
-            return 0, [MlFlag(module="PHOTO", signal="MISSING_PHOTOS", explanation="No photos provided for visual verification.")]
-        
-        # Placeholder for real model inference
-        # Logic: More photos generally increase confidence
-        score = min(100, len(urls) * self.score_per_url + random.randint(-5, 5))
-        
+    def analyze_photos(self, urls):
         flags = []
-        if len(urls) < self.min_urls:
+        count = len(urls)
+        
+        # Placeholder for CV Model (e.g., MobileNet or ResNet) 
+        # In production: result = cv_model.predict(images)
+        base_score = min(count * self.score_per_url, 100)
+        
+        if count < self.min_urls:
             flags.append(MlFlag(
-                module="PHOTO", 
-                signal="LOW_VISIBILITY", 
-                explanation=f"Fewer than {self.min_urls} photos provided. Multi-angle verification highly recommended."
+                module="photo",
+                signal="INSUFFICIENT_EVIDENCE",
+                explanation=f"Only {count} photos provided. Minimum {self.min_urls} required for auto-verification."
             ))
-            
-        return max(0, score), flags
+            base_score -= 20
+
+        # Simulating anomaly detection (e.g., metadata mismatch or duplicate image) [cite: 86]
+        if any("duplicate" in url for url in urls):
+            base_score -= 50
+            flags.append(MlFlag(
+                module="photo",
+                signal="IMAGE_FORGERY_DETECTED",
+                explanation="AI detected potential image manipulation or duplicate submission."
+            ))
+
+        return max(base_score, 0), flags

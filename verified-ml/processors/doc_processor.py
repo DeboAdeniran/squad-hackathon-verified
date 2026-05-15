@@ -1,31 +1,26 @@
 import random
-from typing import List
 from schemas import MlFlag
 
 class DocumentProcessor:
-    def __init__(self, score_per_url: int = 40, error_chance: float = 0.1):
+    def __init__(self, score_per_url, error_chance):
         self.score_per_url = score_per_url
         self.error_chance = error_chance
-        # In production, initialize OCR engines (EasyOCR, Tesseract)
-        pass
 
-    def analyze_documents(self, urls: List[str]) -> tuple[int, List[MlFlag]]:
-        """
-        Performs OCR and document authenticity checks.
-        """
-        if not urls:
-            return 0, [MlFlag(module="DOCUMENT", signal="MISSING_DOCS", explanation="No supporting documents (receipts/reports) attached.")]
-            
-        # Placeholder OCR logic
-        score = min(100, len(urls) * self.score_per_url + random.randint(0, 10))
-        
+    def analyze_documents(self, urls):
         flags = []
-        # Simulate an OCR mismatch flag
+        if not urls:
+            return 0, [MlFlag(module="doc", signal="MISSING_DOCS", explanation="No documents provided for OCR verification.")]
+
+        # Simulating OCR Analysis (e.g., EasyOCR or Tesseract) [cite: 93]
+        score = 90 
+        
+        # Randomly simulate an OCR mismatch flag (10% chance)
         if random.random() < self.error_chance:
+            score -= 30
             flags.append(MlFlag(
-                module="DOCUMENT",
-                signal="OCR_NAME_MISMATCH",
-                explanation="Name on receipt does not match claimant name."
+                module="doc",
+                signal="OCR_MISMATCH",
+                explanation="Discrepancy found between document text and claim details."
             ))
-            
+
         return score, flags

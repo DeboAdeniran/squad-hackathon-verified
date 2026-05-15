@@ -1,15 +1,15 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Environments
 venv/
 .env
 
-# Node
-node_modules/
-package-lock.json
+# Python internals
+__pycache__/
+*.py[cod]
+*$py.class
 
-# IDE
-.idea/
-.vscode/
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Model Artifacts (Optional: Keep .pkl if you want the judge to have it immediately)
+# models/

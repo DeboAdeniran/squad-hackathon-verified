@@ -1,47 +1,36 @@
-from schemas import MlFlag, ClaimantPolicyHistory
+import joblib
+import numpy as np
+from schemas import MlFlag
 
 class BehavioralProcessor:
-    def __init__(
-        self, 
-        max_claim_rate: float = 0.5, 
-        new_policy_threshold_days: int = 90,
-        high_freq_penalty: int = 40,
-        new_policy_penalty: int = 20
-    ):
+    def __init__(self, max_claim_rate, new_policy_threshold_days, high_freq_penalty, new_policy_penalty):
         self.max_claim_rate = max_claim_rate
-        self.new_policy_threshold_days = new_policy_threshold_days
-        self.high_freq_penalty = high_freq_penalty
         self.new_policy_penalty = new_policy_penalty
-        # In production, load scikit-learn risk models here
-        pass
-
-    def analyze_behavior(self, history: ClaimantPolicyHistory) -> tuple[int, list[MlFlag]]:
-        """
-        Analyzes historical patterns for fraud indicators.
-        """
-        # Calculate risk based on claims per month
-        claims_rate = history.totalClaims / (max(1, history.monthsOnPolicy))
+        # In a real app, load the trained model:
+        # self.model = joblib.load("models/behavioral_model.pkl")
         
-        # Base score starts high and drops with risk
-        score = 100
+    def analyze_behavior(self, history):
         flags = []
+        # Logical signals for Trust Scoring [cite: 93]
+        claims_rate = history.totalClaims / max(history.monthsOnPolicy, 1)
+        
+        # Base Score (Simulating model.predict_proba)
+        score = 100
         
         if claims_rate > self.max_claim_rate:
-            score -= self.high_freq_penalty
+            score -= 40
             flags.append(MlFlag(
-                module="BEHAVIORAL",
-                signal="HIGH_CLAIM_FREQUENCY",
-                explanation=f"User has filed {history.totalClaims} claims in {history.monthsOnPolicy} months (Rate: {claims_rate:.2f})."
+                module="behavioral", 
+                signal="HIGH_CLAIM_FREQUENCY", 
+                explanation="Claimant exceeds average claims per month threshold."
             ))
             
-        # Approximately 30 days per month
-        months_threshold = self.new_policy_threshold_days / 30
-        if history.monthsOnPolicy < months_threshold:
+        if history.monthsOnPolicy < 3:
             score -= self.new_policy_penalty
             flags.append(MlFlag(
-                module="BEHAVIORAL",
-                signal="NEW_POLICY_CLAIM",
-                explanation=f"Claim filed within first {self.new_policy_threshold_days} days of policy."
+                module="behavioral", 
+                signal="NEW_POLICY_RISK", 
+                explanation="Policy is less than 90 days old; higher scrutiny required."
             ))
-            
-        return max(0, score), flags
+
+        return max(score, 0), flags
