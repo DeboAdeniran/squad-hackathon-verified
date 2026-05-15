@@ -2,7 +2,7 @@
 
 export default function Topbar({ title, crumb, actions }: any) {
   return (
-    <div className="mb-8 pb-5 border-b border-[rgba(20,17,13,0.08)] relative">
+    <div className="mb-8 pb-5 border-b border-[rgba(20,17,13,0.08)] sticky top-0 z-10 bg-slate-50">
       <div className="absolute bottom-0 left-0 w-14 h-0.5 bg-[#d63a1f]" />
       {crumb && (
         <div className="text-[11px] text-[rgba(20,17,13,0.46)] font-mono uppercase mb-6 lg:mb-2.5 tracking-wide">

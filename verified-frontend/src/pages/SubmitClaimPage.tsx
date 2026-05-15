@@ -212,11 +212,8 @@ export default function SubmitClaimPage() {
           claimedAmount: form.claimedAmount as number,
           incidentDate: form.incidentDate,
           description: form.description,
-          bankDetails: {
-            accountNumber: bankDetails.accountNumber,
-            bankCode: bankDetails.bankCode,
-            accountName: bankDetails.accountName,
-          },
+          accountNumber: bankDetails.accountNumber,
+          bankCode: bankDetails.bankCode,
         },
         photos: photos.map((p) => p.file),
         documents: docs.map((d) => d.file),

@@ -10,6 +10,7 @@ import ClaimsListPage from './pages/ClaimsListPage';
 import SubmitClaimPage from './pages/SubmitClaimPage';
 import ClaimResultPage from './pages/ClaimResultPage';
 import ClaimDetailPage from './pages/ClaimDetailPage';
+import RegisterPage from './pages/RegisterPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             {/* Public — no sidebar */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* Protected — ProtectedRoute redirects to /login if not authenticated */}
             <Route element={<ProtectedRoute />}>

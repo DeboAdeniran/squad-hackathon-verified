@@ -491,9 +491,7 @@ export default function ClaimDetailPage() {
                     </label>
                   </div>
                   <div className="font-mono text-sm font-semibold text-gray-900">
-                    {claim.bankDetails?.bankCode
-                      ? getBankNameByCode(claim?.bankCode)
-                      : '—'}
+                    {claim?.bankCode ? getBankNameByCode(claim?.bankCode) : '—'}
                   </div>
                 </div>
                 {claim?.accountName && (

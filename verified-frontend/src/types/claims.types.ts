@@ -23,7 +23,8 @@ export interface ClaimSubmitRequest {
   claimedAmount: number;
   incidentDate: string; // ISO date string: "YYYY-MM-DD"
   description: string; // min 20 chars
-  bankDetails: BankDetails;
+  accountNumber: string;
+  bankCode: string;
 }
 export interface verifyAccountRequest {
   accountNumber: string;
@@ -95,6 +96,9 @@ export interface ClaimResult {
 export interface ClaimDetail {
   claimId: string;
   claimantName: string;
+  accountName: string;
+  accountNumber: string;
+  bankCode: string;
   policyNumber: string;
   claimType: ClaimType;
   claimedAmount: number;
