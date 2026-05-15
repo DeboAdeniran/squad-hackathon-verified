@@ -1,2 +1,11 @@
-package com.verified.dto.response;public class AccountLookupResponse {
+package com.verified.dto.response;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class AccountLookupResponse {
+    private String accountName;
+    private String accountNumber;
+    private String bankCode;
 }
