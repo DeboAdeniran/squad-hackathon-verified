@@ -7,12 +7,14 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
+import { claimsApi } from '../api';
+import banks from '../data/nigerian_banks.json';
 
 interface BankFormState {
   accountNumber: string;
   bankCode: string;
   bankName: string;
-  verifiedAccountName: string;
+  accountName: string;
   isVerifying: boolean;
   isVerified: boolean;
   verificationError: string | null;
@@ -23,19 +25,6 @@ interface BankFormProps {
   onBankDetailsChange: (details: BankFormState) => void;
   disabled?: boolean;
 }
-
-// Mock bank data - replace with actual API call
-const banks = [
-  { code: '001', name: 'Access Bank' },
-  { code: '002', name: 'UBA' },
-  { code: '003', name: 'GTBank' },
-  { code: '004', name: 'First Bank' },
-  { code: '005', name: 'Zenith Bank' },
-  { code: '006', name: 'Fidelity Bank' },
-  { code: '007', name: 'Stanbic IBTC' },
-  { code: '008', name: 'Union Bank' },
-  { code: '009', name: 'Wema Bank' },
-];
 
 export function BankForm({
   bankDetails,
@@ -68,26 +57,16 @@ export function BankForm({
     });
 
     try {
-      // Replace with actual API call
-      // const response = await api.verifyBankAccount({
-      //   accountNumber: bankDetails.accountNumber,
-      //   bankCode: bankDetails.bankCode
-      // });
-
-      // Mock verification delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock response - replace with actual API response
-      const mockVerification = {
-        accountName: `John Doe`, // This would come from your verification API
-        status: 'success',
-      };
+      const response = await claimsApi.verifyAccount({
+        accountNumber: bankDetails.accountNumber,
+        bankCode: bankDetails.bankCode,
+      });
 
       onBankDetailsChange({
         ...bankDetails,
         isVerifying: false,
         isVerified: true,
-        verifiedAccountName: mockVerification.accountName,
+        accountName: response.accountName,
         verificationError: null,
       });
 
@@ -112,16 +91,25 @@ export function BankForm({
         field === 'accountNumber' || field === 'bankCode'
           ? false
           : bankDetails.isVerified,
-      verifiedAccountName:
+      accountName:
         field === 'accountNumber' || field === 'bankCode'
           ? ''
-          : bankDetails.verifiedAccountName,
+          : bankDetails.accountName,
       verificationError:
         field === 'accountNumber' || field === 'bankCode'
           ? null
           : bankDetails.verificationError,
     });
     setTouched((prev) => new Set(prev).add(field));
+  };
+
+  const handleEditVerification = () => {
+    onBankDetailsChange({
+      ...bankDetails,
+      isVerified: false,
+      accountName: '',
+      verificationError: null,
+    });
   };
 
   const showBankError = (field: keyof BankFormState): boolean => {
@@ -160,7 +148,9 @@ export function BankForm({
                 handleBankFieldChange('accountNumber', value);
               }
             }}
-            disabled={disabled || bankDetails.isVerifying}
+            disabled={
+              disabled || bankDetails.isVerifying || bankDetails.isVerified
+            }
           />
           <div className="hint text-xs text-gray-400 mt-1">
             10-digit account number
@@ -182,20 +172,31 @@ export function BankForm({
             }`}
             value={bankDetails.bankCode}
             onChange={(e) => {
-              const selectedBank = banks.find((b) => b.code === e.target.value);
-              handleBankFieldChange('bankCode', e.target.value);
-              if (selectedBank) {
-                handleBankFieldChange('bankName', selectedBank.name);
-              }
+              const code = e.target.value;
+              const selectedBank = banks.find((b) => b.bank_code === code);
+
+              onBankDetailsChange({
+                ...bankDetails,
+                bankCode: code,
+                bankName: selectedBank?.bank_name || '',
+                isVerified: false,
+                accountName: '',
+                verificationError: null,
+              });
+              setTouched((prev) => new Set(prev).add('bankCode'));
             }}
-            disabled={disabled || bankDetails.isVerifying}
+            disabled={
+              disabled || bankDetails.isVerifying || bankDetails.isVerified
+            }
           >
             <option value="">Select bank...</option>
-            {banks.map((bank) => (
-              <option key={bank.code} value={bank.code}>
-                {bank.name}
-              </option>
-            ))}
+            {banks
+              .sort((a, b) => a.bank_name.localeCompare(b.bank_name))
+              .map((bank) => (
+                <option key={bank.bank_code} value={bank.bank_code}>
+                  {bank.bank_name}
+                </option>
+              ))}
           </select>
           <div className="hint text-xs text-gray-400 mt-1">
             Select your bank
@@ -232,17 +233,27 @@ export function BankForm({
           )}
 
           {bankDetails.isVerified && (
-            <div className="flex items-center gap-2 mt-2 p-3 bg-verified/10 rounded-lg border border-verified/20">
-              <UserCheck size={16} className="text-verified shrink-0" />
-              <div className="flex-1">
-                <div className="text-xs font-medium text-verified">
-                  Account Verified
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 bg-verified/10 rounded-lg border border-verified/20">
+                <UserCheck size={16} className="text-verified shrink-0" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-verified">
+                    Account Verified
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {bankDetails.accountName}
+                  </div>
                 </div>
-                <div className="text-sm font-semibold">
-                  {bankDetails.verifiedAccountName}
-                </div>
+                <Check size={14} className="text-verified" />
               </div>
-              <Check size={14} className="text-verified" />
+              <button
+                type="button"
+                className="btn btn-secondary w-full"
+                onClick={handleEditVerification}
+                disabled={disabled}
+              >
+                Edit Details
+              </button>
             </div>
           )}
         </div>

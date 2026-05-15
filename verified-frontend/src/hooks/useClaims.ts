@@ -4,6 +4,7 @@ import type {
   ClaimsQueryParams,
   ClaimSubmitRequest,
   ReviewRequest,
+  verifyAccountRequest,
 } from '../types';
 
 export function useClaims(params: ClaimsQueryParams = {}) {
@@ -57,5 +58,12 @@ export function useReviewClaimMutation() {
         exact: false,
       });
     },
+  });
+}
+
+export function useVerifyAccountMutation() {
+  return useMutation({
+    mutationFn: (payload: verifyAccountRequest) =>
+      claimsApi.verifyAccount(payload),
   });
 }

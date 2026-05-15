@@ -10,6 +10,12 @@ import {
 
 // ── Requests ──────────────────────────────────────────────────────────────────
 
+export interface BankDetails {
+  accountNumber: string;
+  bankCode: string;
+  accountName?: string;
+}
+
 export interface ClaimSubmitRequest {
   claimantName: string;
   policyNumber: string;
@@ -17,11 +23,11 @@ export interface ClaimSubmitRequest {
   claimedAmount: number;
   incidentDate: string; // ISO date string: "YYYY-MM-DD"
   description: string; // min 20 chars
-  bankDetails: {
-    accountNumber: string;
-    bankCode: string;
-    verifiedAccountName: string;
-  };
+  bankDetails: BankDetails;
+}
+export interface verifyAccountRequest {
+  accountNumber: string;
+  bankCode: string;
 }
 export interface ReviewRequest {
   decision: ReviewDecision;
@@ -94,6 +100,7 @@ export interface ClaimDetail {
   claimedAmount: number;
   incidentDate: string; // LocalDate as ISO string
   description: string;
+  bankDetails: BankDetails;
   createdAt: string;
   files: FileItem[];
   squadTransactions: SquadTransaction[];

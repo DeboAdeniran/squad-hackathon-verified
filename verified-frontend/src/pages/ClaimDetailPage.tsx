@@ -10,6 +10,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   X,
+  Building2,
+  CreditCard,
 } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import { StatusBadge, TierBadge } from '../components/ui';
@@ -41,6 +43,7 @@ import { useClaimDetail } from '../hooks/useClaimDetail';
 import { useReviewClaimMutation } from '../hooks';
 import { getApiErrorMessage } from '../api';
 import { PDFViewerModal } from '../components/PDFViewerModal';
+import banks from '../data/nigerian_banks.json';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +53,11 @@ const fmtDate = (date: string) =>
   date ? new Date(date).toLocaleDateString() : 'N/A';
 const fmtDateTime = (date: string) =>
   date ? new Date(date).toLocaleString() : 'N/A';
+
+const getBankNameByCode = (code: string): string => {
+  const bank = banks.find((b) => b.bank_code === code);
+  return bank?.bank_name || code;
+};
 
 const getGaugeColor = (score: number | null) => {
   if (score === null) return '#9ca3af';
@@ -455,6 +463,53 @@ export default function ClaimDetailPage() {
               <p className="text-sm leading-relaxed text-gray-500">
                 {claim.description}
               </p>
+            </div>
+
+            {/* Bank Details */}
+            <div className="glass p-4 sm:p-5">
+              <div className="section-title">
+                Settlement account
+                <span className="label-pill">bankDetails</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard size={14} className="text-gray-400" />
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Account Number
+                    </label>
+                  </div>
+                  <div className="font-mono text-sm font-semibold text-gray-900">
+                    {claim?.accountNumber || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 size={14} className="text-gray-400" />
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Bank
+                    </label>
+                  </div>
+                  <div className="font-mono text-sm font-semibold text-gray-900">
+                    {claim.bankDetails?.bankCode
+                      ? getBankNameByCode(claim?.bankCode)
+                      : '—'}
+                  </div>
+                </div>
+                {claim?.accountName && (
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Verified Account Name
+                    </label>
+                    <div className="mt-2 flex items-center gap-2 p-3 bg-verified/10 rounded-lg border border-verified/20">
+                      <Check size={14} className="text-verified shrink-0" />
+                      <span className="text-sm font-semibold text-gray-900">
+                        {claim?.accountName}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

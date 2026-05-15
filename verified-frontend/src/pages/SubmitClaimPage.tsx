@@ -33,7 +33,7 @@ interface BankDetailsState {
   accountNumber: string;
   bankCode: string;
   bankName: string;
-  verifiedAccountName: string;
+  accountName: string;
   isVerifying: boolean;
   isVerified: boolean;
   verificationError: string | null;
@@ -82,7 +82,7 @@ export default function SubmitClaimPage() {
     accountNumber: '',
     bankCode: '',
     bankName: '',
-    verifiedAccountName: '',
+    accountName: '',
     isVerifying: false,
     isVerified: false,
     verificationError: null,
@@ -212,11 +212,10 @@ export default function SubmitClaimPage() {
           claimedAmount: form.claimedAmount as number,
           incidentDate: form.incidentDate,
           description: form.description,
-          // Add bank details to the submission
           bankDetails: {
             accountNumber: bankDetails.accountNumber,
             bankCode: bankDetails.bankCode,
-            verifiedAccountName: bankDetails.verifiedAccountName,
+            accountName: bankDetails.accountName,
           },
         },
         photos: photos.map((p) => p.file),

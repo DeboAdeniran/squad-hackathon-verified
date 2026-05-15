@@ -6,6 +6,7 @@ import type {
   PaginatedClaims,
   ClaimsQueryParams,
   ReviewRequest,
+  verifyAccountRequest,
 } from '../types';
 
 export const claimsApi = {
@@ -78,5 +79,22 @@ export const claimsApi = {
     payload: ReviewRequest,
   ): Promise<void> => {
     await axiosInstance.post(`/api/claims/${claimId}/review`, payload);
+  },
+
+  verifyAccount: async (
+    payload: verifyAccountRequest,
+  ): Promise<{
+    accountName: string;
+    accountNumber: string;
+    bankCode: string;
+  }> => {
+    const { data } = await axiosInstance.get<{
+      accountName: string;
+      accountNumber: string;
+      bankCode: string;
+    }>(`/api/claims/verify-account`, {
+      params: payload,
+    });
+    return data;
   },
 };
