@@ -35,11 +35,14 @@ public class ClaimController {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(claimService.submitClaim(request, photos, documents));
     }
-//    @PostMapping("/submit")
-//    public ResponseEntity<
-//            ClaimSubmitResponse> submit(@Valid @RequestBody ClaimSubmitRequest request) {
-//        return ResponseEntity.status(HttpStatus.ACCEPTED).body(claimService.submitClaim(request));
-//    }
+
+    @Operation(summary = "Verify bank account number before claim submission")
+    @GetMapping("/verify-account")
+    public ResponseEntity<AccountLookupResponse> verifyAccount(
+            @RequestParam String bankCode,
+            @RequestParam String accountNumber) {
+        return ResponseEntity.ok(claimService.lookupBankAccount(bankCode, accountNumber));
+    }
     @Operation(summary = "Upload photos and documents for a claim")
     @PostMapping(value = "/{id}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ClaimFileResponse> uploadFiles(

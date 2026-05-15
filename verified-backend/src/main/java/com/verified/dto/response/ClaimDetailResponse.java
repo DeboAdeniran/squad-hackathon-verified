@@ -16,6 +16,9 @@ import java.util.UUID;
 public class ClaimDetailResponse {
     private UUID claimId;
     private String claimantName;
+    private String accountName;
+    private String accountNumber;
+    private String bankCode;
     private String policyNumber;
     private ClaimType claimType;
     private BigDecimal claimedAmount;

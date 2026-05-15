@@ -25,6 +25,15 @@ public class ClaimSubmitRequest {
     @NotBlank(message = "Description is required")
     @Size(min = 20, message = "Description must be at least 20 characters")
     private String description;
+    @NotBlank(message = "Account number is required")
+    @Size(min = 10, max = 10, message = "Account number must be exactly 10 digits")
+    private String accountNumber;
+    @NotBlank(message = "Bank code is required")
+    private String bankCode;
     private List<String> photoUrls = new ArrayList<>();
     private List<String> documentUrls = new ArrayList<>();
+    @Min(value = 0, message = "Total claims cannot be negative")
+    private int totalPreviousClaims = 0;
+    @Min(value = 1, message = "Months on policy must be at least 1")
+    private int monthsOnPolicy = 1;
 }

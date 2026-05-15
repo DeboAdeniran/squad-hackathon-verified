@@ -1,8 +1,8 @@
 package com.verified.service.implementation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.verified.dto.request.SquadTransferRequest;
 import com.verified.dto.squad.SquadApiResponse;
-import com.verified.dto.squad.SquadEscrowRequest;
 import com.verified.exception.BusinessRuleViolationException;
 import com.verified.exception.ResourceNotFoundException;
 import com.verified.integration.SquadApiClient;
@@ -15,7 +15,11 @@ import com.verified.repository.SquadTransactionRepository;
 import com.verified.service.SquadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Slf4j
 @Service
@@ -24,43 +28,25 @@ public class SquadServiceImpl implements SquadService {
     private final SquadApiClient squadApiClient;
     private final SquadTransactionRepository squadTransactionRepository;
     private final ObjectMapper objectMapper;
+    @Value("${squad.merchant.id}")
+    private String merchantId;
     @Override
     public void processPayment(Claim claim, TrustScore trustScore) {
-        String transactionRef = "VFD-" + claim.getId().toString().substring(0, 8).toUpperCase();
-
-        SquadEscrowRequest escrowRequest = SquadEscrowRequest.builder()
-                .transactionRef(transactionRef)
-                .amount(claim.getClaimedAmount())
-                .currency("NGN")
-                .customerEmail("claims@verified.ng")
-                .description("Insurance claim escrow - " + claim.getPolicyNumber())
-                .build();
-
-        SquadApiResponse escrowResponse = squadApiClient.createEscrow(escrowRequest);
-        logTransaction(claim, SquadAction.RELEASE_PAYMENT, transactionRef,
-                escrowResponse, "CREATE_ESCROW");
-
-        switch (trustScore.getTier()) {
+        switch (trustScore.getTier()){
             case VERIFIED -> {
-                SquadApiResponse releaseResponse = squadApiClient.releasePayment(transactionRef);
-                logTransaction(claim, SquadAction.RELEASE_PAYMENT, transactionRef,
-                        releaseResponse, "RELEASE");
-                log.info("Payment RELEASED for claim {} — score: {}",
-                        claim.getId(), trustScore.getTrustScore());
+                executeTransfer(claim);
             }
             case REVIEW -> {
-                SquadApiResponse holdResponse = squadApiClient.holdEscrow(transactionRef);
-                logTransaction(claim, SquadAction.HOLD_ESCROW, transactionRef,
-                        holdResponse, "HOLD");
-                log.info("Payment HELD for claim {} — pending human review",
+                log.info("Claim {} is UNDER_REVIEW — no Squad call made, awaiting human decision",
                         claim.getId());
-            }
-            case FLAGGED -> {
-                SquadApiResponse blockResponse = squadApiClient.blockPayment(transactionRef);
-                logTransaction(claim, SquadAction.BLOCK_PAYMENT, transactionRef,
-                        blockResponse, "BLOCK");
-                log.info("Payment BLOCKED for claim {} — fraud detected, score: {}",
-                        claim.getId(), trustScore.getTrustScore());
+                logInternalTransaction(claim, SquadAction.HOLD_ESCROW, TxStatus.PENDING,
+                        "Held pending human review — no Squad call");
+            }case FLAGGED -> {
+                // No Squad call — fraud suspected, money blocked internally
+                log.info("Claim {} is FLAGGED — payment blocked internally, no Squad call",
+                        claim.getId());
+                logInternalTransaction(claim, SquadAction.BLOCK_PAYMENT, TxStatus.PENDING,
+                        "Blocked due to fraud flag — no Squad call");
             }
         }
     }
@@ -70,31 +56,71 @@ public class SquadServiceImpl implements SquadService {
         if (claim == null) {
             throw new ResourceNotFoundException("Claim not found for Squad payment action");
         }
-
-        String transactionRef = "VFD-" + claim.getId().toString().substring(0, 8).toUpperCase();
-
-        SquadApiResponse response = switch (action) {
-            case "RELEASE" -> squadApiClient.releasePayment(transactionRef);
-            case "BLOCK" -> squadApiClient.blockPayment(transactionRef);
-            case "HOLD" -> squadApiClient.holdEscrow(transactionRef);
+        switch (action) {
+            case "RELEASE" -> executeTransfer(claim);
+            case "BLOCK" -> {
+                log.info("Claim {} manually BLOCKED by adjudicator", claim.getId());
+                logInternalTransaction(claim, SquadAction.BLOCK_PAYMENT, TxStatus.SUCCESS,
+                        "Manually blocked by adjudicator");
+            }
             default -> throw new BusinessRuleViolationException("Unknown Squad action: " + action);
-        };
-
-        SquadAction squadAction = switch (action) {
-            case "RELEASE" -> SquadAction.RELEASE_PAYMENT;
-            case "BLOCK" -> SquadAction.BLOCK_PAYMENT;
-            case "HOLD" -> SquadAction.HOLD_ESCROW;
-            default -> throw new BusinessRuleViolationException("Unknown Squad action: " + action);
-        };
-
-        logTransaction(claim, squadAction, transactionRef, response, action);
+        }
     }
 
-    private void logTransaction(Claim claim, SquadAction action,
-                                String ref, SquadApiResponse response,
-                                String actionLabel) {
-        TxStatus status = "FAILED".equals(response.getStatus()) ? TxStatus.FAILED : TxStatus.SUCCESS;
+    private void executeTransfer(Claim claim) {
+        String ref = merchantId + "-VFD-" + claim.getId().toString().replace("-", "").substring(0, 8).toUpperCase();
+        log.debug("Transfer reference: {}", ref);
+        SquadApiResponse lookup = squadApiClient.lookupAccount(
+                claim.getBankCode(), claim.getAccountNumber());
 
+        if (!Boolean.TRUE.equals(lookup.getSuccess())) {
+            log.error("Account lookup failed for claim {} — account: {}",
+                    claim.getId(), claim.getAccountNumber());
+            logInternalTransaction(claim, SquadAction.RELEASE_PAYMENT, TxStatus.FAILED,
+                    "Account lookup failed: " + lookup.getMessage());
+            return;
+        }
+
+        String amountInKobo = claim.getClaimedAmount()
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(0, RoundingMode.HALF_UP)
+                .toBigInteger()
+                .toString();
+
+        SquadTransferRequest transferRequest = SquadTransferRequest.builder()
+                .transactionReference(ref)
+                .amount(amountInKobo)
+                .bankCode(claim.getBankCode())
+                .accountNumber(claim.getAccountNumber())
+                .accountName(claim.getAccountName())
+                .currencyId("NGN")
+                .remark("Insurance claim payout - " + claim.getPolicyNumber())
+                .build();
+
+        SquadApiResponse transferResponse = squadApiClient.transferFunds(transferRequest);
+
+        if (transferResponse.getSuccess() == null || !transferResponse.getSuccess()) {
+
+            String msg = transferResponse.getMessage();
+            if (msg != null && msg.toLowerCase().contains("insufficient")) {
+                log.error("LEDGER INSUFFICIENT BALANCE for claim {} — amount: {}",
+                        claim.getId(), claim.getClaimedAmount());
+            }
+            logSquadTransaction(claim, SquadAction.RELEASE_PAYMENT, ref, transferResponse, TxStatus.FAILED);
+            return;
+        }
+
+        TxStatus status = Boolean.TRUE.equals(transferResponse.getSuccess())
+                ? TxStatus.SUCCESS : TxStatus.FAILED;
+
+        logSquadTransaction(claim, SquadAction.RELEASE_PAYMENT, ref, transferResponse, status);
+
+        log.info("Transfer {} for claim {} — ref: {}, status: {}",
+                status, claim.getId(), ref, transferResponse.getMessage());
+    }
+    private void logSquadTransaction(Claim claim, SquadAction action,
+                                     String ref, SquadApiResponse response,
+                                     TxStatus status) {
         String responseBody;
         try {
             responseBody = objectMapper.writeValueAsString(response);
@@ -112,7 +138,18 @@ public class SquadServiceImpl implements SquadService {
                 .build();
 
         squadTransactionRepository.save(tx);
-        log.info("Squad transaction logged: {} — {} — {}",
-                actionLabel, ref, status);
+    }
+
+    private void logInternalTransaction(Claim claim, SquadAction action,
+                                        TxStatus status, String note) {
+        SquadTransaction tx = SquadTransaction.builder()
+                .claim(claim)
+                .action(action)
+                .squadReference("INTERNAL-" + claim.getId().toString().substring(0, 8).toUpperCase())
+                .amount(claim.getClaimedAmount())
+                .status(status)
+                .responseBody(note)
+                .build();
+        squadTransactionRepository.save(tx);
     }
 }
