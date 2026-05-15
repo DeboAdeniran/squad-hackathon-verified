@@ -61,3 +61,8 @@ springdoc:
     path: /swagger-ui.html
     try-it-out-enabled: true
     operations-sorter: method
+
+supabase:
+  url: ${SUPABASE_URL}
+  anon-key: ${SUPABASE_ANON_KEY}
+  bucket: ${SUPABASE_BUCKET}
