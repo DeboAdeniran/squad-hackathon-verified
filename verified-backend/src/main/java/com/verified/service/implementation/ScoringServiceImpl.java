@@ -62,8 +62,8 @@ public class ScoringServiceImpl implements ScoringService {
                     .documentUrls(documentUrls)
                     .claimantPolicyHistory(
                             MlScoreRequest.ClaimantPolicyHistory.builder()
-                                    .totalClaims(1)
-                                    .monthsOnPolicy(12)
+                                    .totalClaims(claim.getTotalPreviousClaims())
+                                    .monthsOnPolicy(claim.getMonthsOnPolicy())
                                     .build()
                     )
                     .build();
@@ -105,12 +105,12 @@ public class ScoringServiceImpl implements ScoringService {
     }
 
     private TrustScore buildTrustScore(Claim claim, MlScoreResponse ml){
-        ScoreTier tier = switch (ml.getTier().toUpperCase()) {
+        ScoreTier tier = switch (ml.getTier() != null ? ml.getTier().toUpperCase() : "FLAGGED") {
             case "VERIFIED" -> ScoreTier.VERIFIED;
             case "REVIEW" -> ScoreTier.REVIEW;
             default -> ScoreTier.FLAGGED;
         };
-        SquadAction squadAction = switch (ml.getSquadAction().toUpperCase()) {
+        SquadAction squadAction = switch (ml.getSquadAction() != null ? ml.getSquadAction().toUpperCase() : "BLOCK_PAYMENT") {
             case "RELEASE_PAYMENT" -> SquadAction.RELEASE_PAYMENT;
             case "HOLD_ESCROW" -> SquadAction.HOLD_ESCROW;
             default -> SquadAction.BLOCK_PAYMENT;

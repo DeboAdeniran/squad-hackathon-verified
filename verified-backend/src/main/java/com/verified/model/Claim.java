@@ -39,6 +39,12 @@ public class Claim {
     private LocalDate incidentDate;
     @Column(columnDefinition = "TEXT")
     private String description;
+    @Column(nullable = false, length = 10)
+    private String accountNumber;
+    @Column(nullable = false, length = 10)
+    private String bankCode;
+    @Column(nullable = false)
+    private String accountName;
     @Enumerated(EnumType.STRING)
     private ClaimStatus status;
     @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -50,4 +56,9 @@ public class Claim {
     private LocalDateTime createdAt;
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column(nullable = false)
+    private int totalPreviousClaims = 0;
+    @Column(nullable = false)
+    private int monthsOnPolicy = 1;
+
 }

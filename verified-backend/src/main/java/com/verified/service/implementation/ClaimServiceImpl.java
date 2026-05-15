@@ -4,9 +4,11 @@ import com.cloudinary.Cloudinary;
 import com.verified.dto.request.ClaimReviewRequest;
 import com.verified.dto.request.ClaimSubmitRequest;
 import com.verified.dto.response.*;
+import com.verified.dto.squad.SquadApiResponse;
 import com.verified.exception.BusinessRuleViolationException;
 import com.verified.exception.DuplicateResourceException;
 import com.verified.exception.ResourceNotFoundException;
+import com.verified.integration.SquadApiClient;
 import com.verified.model.Claim;
 import com.verified.model.ClaimFile;
 import com.verified.model.TrustScore;
@@ -19,6 +21,7 @@ import com.verified.service.ClaimService;
 import com.verified.service.ScoringService;
 import com.verified.service.SquadService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClaimServiceImpl implements ClaimService {
@@ -41,6 +44,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final SquadTransactionRepository squadTransactionRepository;
     private final ScoringService scoringService;
     private final SquadService squadService;
+    private final SquadApiClient squadApiClient;
     private final Cloudinary cloudinary;
     @Override
     public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request,
@@ -59,10 +63,23 @@ public class ClaimServiceImpl implements ClaimService {
                 .claimedAmount(request.getClaimedAmount())
                 .incidentDate(request.getIncidentDate())
                 .description(request.getDescription())
+                .accountNumber(request.getAccountNumber())
+                .bankCode(request.getBankCode())
+                .accountName("")
                 .status(ClaimStatus.PROCESSING)
+                .totalPreviousClaims(request.getTotalPreviousClaims())
+                .monthsOnPolicy(request.getMonthsOnPolicy())
                 .build();
 
         Claim saved = claimRepository.save(claim);
+
+        SquadApiResponse lookup = squadApiClient.lookupAccount(
+                request.getBankCode(), request.getAccountNumber());
+
+        if (Boolean.TRUE.equals(lookup.getSuccess()) && lookup.getData() != null){
+            saved.setAccountName(extractAccountName(lookup));
+            claimRepository.save(saved);
+        }
 
         if (photos != null) {
             photos.forEach(file -> uploadAndSaveFile(saved, file, FileType.PHOTO));
@@ -80,6 +97,27 @@ public class ClaimServiceImpl implements ClaimService {
                 .build();
     }
 
+    @Override
+    public AccountLookupResponse lookupBankAccount(String bankCode, String accountNumber) {
+        SquadApiResponse response = squadApiClient.lookupAccount(bankCode, accountNumber);
+
+        if (!Boolean.TRUE.equals(response.getSuccess()) || response.getData() == null){
+            throw new BusinessRuleViolationException(
+                    "Could not verify account. Please check the account number and bank code.");
+        }
+
+        String name = extractAccountName(response);
+        if (name == null || name.isBlank()) {
+            throw new BusinessRuleViolationException(
+                    "Account found but name could not be retrieved. Please try again.");
+        }
+
+        return AccountLookupResponse.builder()
+                .accountName(name)
+                .accountNumber(accountNumber)
+                .bankCode(bankCode)
+                .build();
+    }
     private void uploadAndSaveFile(Claim claim, MultipartFile file, FileType fileType){
         try {
             Map uploadResult = cloudinary.uploader().upload(
@@ -104,6 +142,13 @@ public class ClaimServiceImpl implements ClaimService {
         Claim claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Claim not found with id: " + claimId));
 
+        FileType parsedFileType;
+        try {
+            parsedFileType = FileType.valueOf(fileType.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessRuleViolationException("Invalid fileType '" + fileType + "'. Must be PHOTO or DOCUMENT.");
+        }
+
         List<String> urls = new ArrayList<>();
 
         files.forEach(file -> {
@@ -119,7 +164,7 @@ public class ClaimServiceImpl implements ClaimService {
 
                 ClaimFile claimFile = ClaimFile.builder()
                         .claim(claim)
-                        .fileType(FileType.valueOf(fileType.toUpperCase()))
+                        .fileType(parsedFileType)
                         .fileUrl(url)
                         .build();
                 claimFileRepository.save(claimFile);
@@ -241,6 +286,9 @@ public class ClaimServiceImpl implements ClaimService {
                 .claimantName(claim.getClaimantName())
                 .policyNumber(claim.getPolicyNumber())
                 .claimType(claim.getClaimType())
+                .accountName(claim.getAccountName())
+                .accountNumber(claim.getAccountNumber())
+                .bankCode(claim.getBankCode())
                 .claimedAmount(claim.getClaimedAmount())
                 .incidentDate(claim.getIncidentDate())
                 .description(claim.getDescription())
@@ -316,5 +364,17 @@ public class ClaimServiceImpl implements ClaimService {
                         "FLAGGED", flaggedCount
                 ))
                 .build();
+    }
+
+    private String extractAccountName(SquadApiResponse lookup){
+        try {
+            if (lookup.getData() instanceof java.util.Map<?,?> map) {
+                Object name = map.get("account_name");
+                return name != null ? name.toString() : "";
+            }
+        } catch (Exception e) {
+            log.warn("Could not extract account name from lookup response");
+        }
+        return "";
     }
 }
