@@ -1,13 +1,15 @@
 package com.verified.integration;
 
+import com.verified.dto.request.SquadAccountLookupRequest;
+import com.verified.dto.request.SquadTransferRequest;
 import com.verified.dto.squad.SquadApiResponse;
-import com.verified.dto.squad.SquadEscrowRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -22,64 +24,60 @@ public class SquadApiClient {
                 .defaultHeader("Content-Type", "application/json")
                 .build();
     }
-    public SquadApiResponse createEscrow(SquadEscrowRequest request) {
-        log.info("Creating Squad escrow for ref: {}", request.getTransactionRef());
+//    VERIFY ACCOUNT EXISTS
+//    POST /payout/account/lookup
+    public SquadApiResponse lookupAccount(String bankCode, String accountNumber){
+        log.info("Looking up account {} at bank {}", accountNumber, bankCode);
         try {
             return webClient.post()
-                    .uri("/transaction/initiate")
+                    .uri("/payout/account/lookup")
+                    .bodyValue(SquadAccountLookupRequest.builder()
+                            .bankCode(bankCode)
+                            .accountNumber(accountNumber)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(SquadApiResponse.class)
+                    .timeout(Duration.ofSeconds(15))
+                    .block();
+        }catch (Exception e){
+            log.error("Account lookup failed for {}: {}", accountNumber, e.getMessage());
+            return failedResponse("LOOKUP-" + accountNumber);
+        }
+    }
+
+//      PAYOUT
+//    * POST /payout/transfer
+    public SquadApiResponse transferFunds(SquadTransferRequest request){
+        log.info("Transferring funds for ref: {}", request.getTransactionReference());
+        try {
+            return webClient.post()
+                    .uri("/payout/transfer")
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(SquadApiResponse.class)
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(Duration.ofSeconds(20))
                     .block();
-        } catch (Exception e) {
-            log.error("Squad createEscrow failed: {}", e.getMessage());
-            return failedResponse(request.getTransactionRef());
+        }catch (Exception e){
+            log.error("Transfer failed for ref {}: {}", request.getTransactionReference(), e.getMessage());
+            return failedResponse(request.getTransactionReference());
         }
     }
-    public SquadApiResponse releasePayment(String transactionRef) {
-        log.info("Releasing Squad payment for ref: {}", transactionRef);
+
+//    Retry sequence
+//    POST /payout/requery
+    public SquadApiResponse requeryTransfer(String transactionReference) {
+        log.info("Re-querying transfer ref: {}", transactionReference);
         try {
             return webClient.post()
-                    .uri("/transaction/release")
-                    .bodyValue(java.util.Map.of("transaction_ref", transactionRef))
+                    .uri("/payout/requery")
+                    .bodyValue(Map.of("transaction_reference", transactionReference))
                     .retrieve()
                     .bodyToMono(SquadApiResponse.class)
                     .timeout(Duration.ofSeconds(15))
                     .block();
         } catch (Exception e) {
-            log.error("Squad releasePayment failed: {}", e.getMessage());
-            return failedResponse(transactionRef);
-        }
-    }
-    public SquadApiResponse holdEscrow(String transactionRef) {
-        log.info("Holding Squad escrow for ref: {}", transactionRef);
-        try {
-            return webClient.post()
-                    .uri("/transaction/hold")
-                    .bodyValue(java.util.Map.of("transaction_ref", transactionRef))
-                    .retrieve()
-                    .bodyToMono(SquadApiResponse.class)
-                    .timeout(Duration.ofSeconds(15))
-                    .block();
-        } catch (Exception e) {
-            log.error("Squad holdEscrow failed: {}", e.getMessage());
-            return failedResponse(transactionRef);
-        }
-    }
-    public SquadApiResponse blockPayment(String transactionRef) {
-        log.info("Blocking Squad payment for ref: {}", transactionRef);
-        try {
-            return webClient.post()
-                    .uri("/transaction/block")
-                    .bodyValue(java.util.Map.of("transaction_ref", transactionRef))
-                    .retrieve()
-                    .bodyToMono(SquadApiResponse.class)
-                    .timeout(Duration.ofSeconds(15))
-                    .block();
-        } catch (Exception e) {
-            log.error("Squad blockPayment failed: {}", e.getMessage());
-            return failedResponse(transactionRef);
+            log.error("Requery failed for ref {}: {}", transactionReference, e.getMessage());
+            return failedResponse(transactionReference);
         }
     }
     private SquadApiResponse failedResponse(String ref) {
