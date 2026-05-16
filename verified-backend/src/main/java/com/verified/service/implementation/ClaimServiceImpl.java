@@ -9,6 +9,7 @@ import com.verified.exception.BusinessRuleViolationException;
 import com.verified.exception.DuplicateResourceException;
 import com.verified.exception.ResourceNotFoundException;
 import com.verified.integration.SquadApiClient;
+import com.verified.integration.SupabaseStorageClient;
 import com.verified.model.Claim;
 import com.verified.model.ClaimFile;
 import com.verified.model.TrustScore;
@@ -46,6 +47,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final SquadService squadService;
     private final SquadApiClient squadApiClient;
     private final Cloudinary cloudinary;
+    private final SupabaseStorageClient supabaseStorageClient;
     @Override
     public ClaimSubmitResponse submitClaim(ClaimSubmitRequest request,
                                            List<MultipartFile> photos,
@@ -118,13 +120,28 @@ public class ClaimServiceImpl implements ClaimService {
                 .bankCode(bankCode)
                 .build();
     }
-    private void uploadAndSaveFile(Claim claim, MultipartFile file, FileType fileType){
+    private void uploadAndSaveFile(Claim claim, MultipartFile file, FileType fileType) {
         try {
-            Map uploadResult = cloudinary.uploader().upload(
-                    file.getBytes(),
-                    Map.of("folder", "verified/claims/" + claim.getId(), "resource_type", "auto")
-            );
-            String url = (String) uploadResult.get("secure_url");
+            String url;
+            String originalFilename = file.getOriginalFilename() != null
+                    ? file.getOriginalFilename() : "file";
+
+            if (fileType == FileType.PHOTO) {
+                Map uploadResult = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        Map.of(
+                                "folder", "verified/claims/" + claim.getId(),
+                                "resource_type", "image",
+                                "public_id", UUID.randomUUID().toString() + "_" + originalFilename
+                        )
+                );
+                url = (String) uploadResult.get("secure_url");
+            } else {
+                url = supabaseStorageClient.uploadFile(
+                        file.getBytes(), originalFilename,
+                        file.getContentType(), claim.getId()
+                );
+            }
 
             ClaimFile claimFile = ClaimFile.builder()
                     .claim(claim)
@@ -132,11 +149,11 @@ public class ClaimServiceImpl implements ClaimService {
                     .fileUrl(url)
                     .build();
             claimFileRepository.save(claimFile);
+
         } catch (Exception e) {
             throw new BusinessRuleViolationException("File upload failed: " + e.getMessage());
         }
     }
-
     @Override
     public ClaimFileResponse uploadFiles(UUID claimId, List<MultipartFile> files, String fileType) {
         Claim claim = claimRepository.findById(claimId)
@@ -153,14 +170,26 @@ public class ClaimServiceImpl implements ClaimService {
 
         files.forEach(file -> {
             try {
-                Map uploadResult = cloudinary.uploader().upload(
-                        file.getBytes(),
-                        Map.of(
-                                "folder", "verified/claims/" + claimId,
-                                "resource_type", "auto"
-                        )
-                );
-                String url = (String) uploadResult.get("secure_url");
+                String url;
+                String originalFilename = file.getOriginalFilename() != null
+                        ? file.getOriginalFilename() : "file";
+
+                if (parsedFileType == FileType.PHOTO) {
+                    Map uploadResult = cloudinary.uploader().upload(
+                            file.getBytes(),
+                            Map.of(
+                                    "folder", "verified/claims/" + claimId,
+                                    "resource_type", "image",
+                                    "public_id", UUID.randomUUID().toString() + "_" + originalFilename
+                            )
+                    );
+                    url = (String) uploadResult.get("secure_url");
+                } else {
+                    url = supabaseStorageClient.uploadFile(
+                            file.getBytes(), originalFilename,
+                            file.getContentType(), claimId
+                    );
+                }
 
                 ClaimFile claimFile = ClaimFile.builder()
                         .claim(claim)
@@ -317,11 +346,13 @@ public class ClaimServiceImpl implements ClaimService {
 
         if (request.getDecision() == ReviewDecision.APPROVE) {
             claim.setStatus(ClaimStatus.PAID);
+            trustScore.setTier(ScoreTier.VERIFIED);
             trustScore.setSquadAction(SquadAction.RELEASE_PAYMENT);
             trustScoreRepository.save(trustScore);
             squadService.processPaymentAction(claim, "RELEASE");
         } else {
             claim.setStatus(ClaimStatus.BLOCKED);
+            trustScore.setTier(ScoreTier.FLAGGED);
             trustScore.setSquadAction(SquadAction.BLOCK_PAYMENT);
             trustScoreRepository.save(trustScore);
             squadService.processPaymentAction(claim, "BLOCK");
@@ -377,4 +408,6 @@ public class ClaimServiceImpl implements ClaimService {
         }
         return "";
     }
+
+
 }
