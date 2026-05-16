@@ -23,7 +23,7 @@ public class MlServiceClient {
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(MlScoreResponse.class)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(60))
                     .block();
         } catch (Exception e) {
             log.error("ML service call failed for claim {}: {}", request.getClaimId(), e.getMessage());
