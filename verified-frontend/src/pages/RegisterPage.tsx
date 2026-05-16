@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const RegisterPage = () => {
   const { register, isLoading, error } = useAuth();
@@ -196,6 +196,14 @@ const RegisterPage = () => {
             style={{ color: 'var(--t-3)' }}
           >
             Forgot password?
+          </div>
+          <div>
+            <Link
+              to="/login"
+              className="text-[10px] sm:text-xs cursor-pointer transition-colors hover:opacity-70"
+            >
+              Already have an account? <span className="underline">Login</span>
+            </Link>
           </div>
         </div>
       </div>
